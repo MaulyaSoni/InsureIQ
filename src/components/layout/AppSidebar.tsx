@@ -41,8 +41,8 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border max-md:relative max-md:z-auto max-md:h-full max-md:border-r-0">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
-          <Zap className="h-5 w-5 text-sidebar-primary-foreground" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary/20 p-1">
+          <img src="/favicon.png" alt="InsureIQ Logo" className="h-full w-full object-contain" />
         </div>
         <div>
           <h1 className="text-base font-bold tracking-tight text-sidebar-primary-foreground">InsureIQ</h1>

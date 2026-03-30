@@ -35,8 +35,8 @@ export default function Signup() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-3">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <Zap className="h-6 w-6 text-primary-foreground" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 p-1.5">
+            <img src="/favicon.png" alt="InsureIQ Logo" className="h-full w-full object-contain" />
           </div>
           <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
           <CardDescription>Get started with InsureIQ risk analytics</CardDescription>
