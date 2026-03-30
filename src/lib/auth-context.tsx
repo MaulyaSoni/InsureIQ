@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { clearAuthToken, loginApi, persistAuthToken, signupApi } from "@/lib/api";
 
 // Stub user type — replace with Supabase User when connected
 export interface AuthUser {
@@ -22,30 +23,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Replace with supabase.auth.onAuthStateChange + getSession
     const stored = localStorage.getItem("insureiq_user");
+    const token = localStorage.getItem("insureiq_token");
     if (stored) {
       try { setUser(JSON.parse(stored)); } catch { /* ignore */ }
+    }
+    if (!token) {
+      localStorage.removeItem("insureiq_user");
+      setUser(null);
     }
     setLoading(false);
   }, []);
 
-  const login = async (email: string, _password: string) => {
-    // TODO: Replace with supabase.auth.signInWithPassword({ email, password })
-    const mockUser: AuthUser = { id: `user-${Date.now()}`, email, name: email.split("@")[0] };
-    setUser(mockUser);
-    localStorage.setItem("insureiq_user", JSON.stringify(mockUser));
+  const login = async (email: string, password: string) => {
+    const res = await loginApi(email, password);
+    const authUser: AuthUser = {
+      id: String(res.user.id),
+      email: res.user.email,
+      name: res.user.name,
+    };
+    persistAuthToken(res.access_token);
+    setUser(authUser);
+    localStorage.setItem("insureiq_user", JSON.stringify(authUser));
   };
 
-  const signup = async (email: string, _password: string, name?: string) => {
-    // TODO: Replace with supabase.auth.signUp({ email, password })
-    const mockUser: AuthUser = { id: `user-${Date.now()}`, email, name: name || email.split("@")[0] };
-    setUser(mockUser);
-    localStorage.setItem("insureiq_user", JSON.stringify(mockUser));
+  const signup = async (email: string, password: string, name?: string) => {
+    const res = await signupApi(email, password, name);
+    const authUser: AuthUser = {
+      id: String(res.user.id),
+      email: res.user.email,
+      name: res.user.name,
+    };
+    persistAuthToken(res.access_token);
+    setUser(authUser);
+    localStorage.setItem("insureiq_user", JSON.stringify(authUser));
   };
 
   const logout = async () => {
-    // TODO: Replace with supabase.auth.signOut()
+    clearAuthToken();
     setUser(null);
     localStorage.removeItem("insureiq_user");
   };

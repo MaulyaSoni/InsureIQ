@@ -48,7 +48,7 @@ export default function SettingsPage() {
             <Input
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="https://vishleshak-ai.streamlit.app/api"
+              placeholder="http://localhost:8000/api"
             />
             <p className="text-xs text-muted-foreground">Endpoint base for all Vishleshak AI agent APIs</p>
           </div>
@@ -99,18 +99,18 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Database Config Placeholder */}
+      {/* Backend Config Info */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Database Configuration</CardTitle>
+          <CardTitle className="text-base">Backend Configuration</CardTitle>
           <CardDescription>
-            Connect to Supabase for persistent storage. Configure your Supabase project URL and anon key here.
+            InsureIQ uses FastAPI + SQLite + JWT. Configure backend URL above and deploy backend environment variables on Railway.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border-2 border-dashed border-border p-6 text-center">
-            <p className="text-sm text-muted-foreground">Supabase integration placeholder</p>
-            <p className="text-xs text-muted-foreground mt-1">Tables: policies, risk_assessments, claim_predictions, premium_advisories, reports, audit_log</p>
+            <p className="text-sm text-muted-foreground">Backend deployment information panel</p>
+            <p className="text-xs text-muted-foreground mt-1">Required env: GROQ_API_KEY, JWT_SECRET, DATABASE_URL, ENVIRONMENT</p>
           </div>
         </CardContent>
       </Card>
