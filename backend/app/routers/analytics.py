@@ -112,7 +112,7 @@ def risk_scoring(
         "top_features": shap_features,
         "explanation": explanation,
         "agent_type": "risk_scoring",
-        "created_at": now,
+        "created_at": now.isoformat(),
     }
 
     db.add(RiskPrediction(id=result["id"], policy_id=policy.id, prediction_type="risk_assessment", payload=result, created_at=now))
@@ -152,7 +152,7 @@ def claim_prediction(
         "confidence_interval": {"lower": int(predicted * 0.7), "upper": int(predicted * 1.4)},
         "risk_factors": factors,
         "model_version": "xgboost-v1",
-        "created_at": now,
+        "created_at": now.isoformat(),
     }
 
     db.add(RiskPrediction(id=result["id"], policy_id=policy.id, prediction_type="claim_prediction", payload=result, created_at=now))
@@ -210,7 +210,7 @@ def premium_advisory(
         "premium_range": {"min": int(recommended * 0.85), "max": int(recommended * 1.2)},
         "adjustment_factors": factors,
         "justification": justification,
-        "created_at": now,
+        "created_at": now.isoformat(),
     }
 
     db.add(RiskPrediction(id=result["id"], policy_id=policy.id, prediction_type="premium_advisory", payload=result, created_at=now))
@@ -250,7 +250,7 @@ def generate_report(
         "premium_advisory": premium,
         "summary": summary,
         "recommendation": recommendation,
-        "generated_at": now,
+        "generated_at": now.isoformat(),
     }
 
     db.add(
