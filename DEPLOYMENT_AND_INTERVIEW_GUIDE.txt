@@ -1,0 +1,235 @@
+====================================================================
+INSUREIQ — PHASE 4 DEPLOYMENT GUIDE
+====================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+a) EXACT STEP-BY-STEP RAILWAY DEPLOYMENT COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PREREQ: Railway CLI installed, GitHub repo connected.
+
+1. CREATE RAILWAY PROJECT
+   → Go to https://railway.app/dashboard
+   → Click "New Project" → "Deploy from GitHub repo"
+   → Select your InsureIQ repository
+   → Railway auto-detects railway.toml
+
+2. SET ENVIRONMENT VARIABLES
+   → Open your Railway project → "Variables" tab
+   → Add each variable as a key-value pair:
+
+   GROQ_API_KEY= gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   JWT_SECRET=   your-super-secure-random-string-at-least-32-chars
+   DATABASE_URL= sqlite:///./insureiq.db
+   ENVIRONMENT=   production
+   CACHE_TTL_HOURS= 24
+
+3. DEPLOY
+   → Railway triggers automatically on git push to main
+   → Or manually via CLI:
+
+   # Install Railway CLI
+   npm install -g @railway/cli
+
+   # Login
+   railway login
+
+   # Link to project
+   railway link [your-project-id]
+
+   # Open shell in deployment container (for debugging)
+   railway run bash
+
+   # Manually trigger deployment
+   railway up
+
+4. VERIFY DEPLOYMENT
+   → Open https://your-project-name.up.railway.app/health
+   → Should return: {"status": "ok", "environment": "production", ...}
+
+5. GET YOUR PUBLIC URL
+   → Railway dashboard → Deployment → Domain
+   → Format: https://insureiq-something-xxxx.up.railway.app
+   → Use this as VITE_API_BASE_URL in Vercel
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+b) EXACT STEP-BY-STEP VERCEL DEPLOYMENT COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. CREATE VERCEL PROJECT
+   → Go to https://vercel.com/new
+   → Import your GitHub repo: InsureIQ
+   → Root Directory: ./frontend (important!)
+   → Framework Preset: Vite
+   → Click "Deploy"
+
+2. ADD ENVIRONMENT VARIABLE (during or after setup)
+   → Project Settings → Environment Variables
+   → Add:
+
+   Name:  VITE_API_BASE_URL
+   Value: https://your-railway-app.up.railway.app
+   (use your actual Railway domain from step a.5 above)
+
+   → For Production, Review, Development — all three
+
+3. REDEPLOY AFTER ENV VAR
+   → Deployments → Latest → "..." → "Redeploy"
+   → Or push a commit to trigger auto-redeploy
+
+4. CUSTOM DOMAIN (optional)
+   → Project Settings → Domains
+   → Add: insureiq.yourdomain.com
+   → Update DNS: CNAME record pointing to cname.vercel-dns.com
+   → Update VITE_API_BASE_URL to your custom domain
+
+5. VERIFY
+   → Open your Vercel URL
+   → Login/register a test account
+   → Create a policy and run full analysis
+   → Should see LangGraph agent pipeline execute without errors
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+c) RESUME BULLET POINT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Built an Agentic AI vehicle insurance platform (InsureIQ) using LangGraph
+  StateGraph with 5-node Supervisor-Worker architecture; XGBoost (AUC >0.63)
+  + SHAP TreeExplainer for claim prediction and feature attribution; Groq
+  LLMs (llama-3.3-70b, mixtral-8x7b, llama-3.1-8b-instant) for risk
+  explanation, premium advisory, and report generation; 99th-percentile
+  response latency via SQLite LLM response caching; deployed on Railway
+  (backend) + Vercel (frontend); processed 1000+ policies in batch mode
+  with <2s average per-policy latency.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+d) TECHNICAL INTERVIEW QUESTIONS — AGENTIC AI DEEP DIVE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Q1: "Walk me through how the LangGraph StateGraph decides which agent
+    handles each incoming request. What happens if the supervisor's
+    LLM call fails — does the whole pipeline crash?"
+
+A1:
+The supervisor node receives the InsureIQState (which already contains the
+user_query and any prior ML results) and invokes Groq's llama-3.1-8b-instant
+with a single-shot classification prompt asking it to return one of five
+route strings: risk_only, risk_and_explain, premium, explain_only, or
+full_report.
+
+This is NOT a chat completion — it's a deterministic routing decision.
+The prompt is minimal (under 100 tokens), so it runs fast on the cheapest
+Groq model. The response is just a single word, so even if parsing fails
+mildly, we validate it against the 5 allowed values and fall back to
+"full_report" if it's invalid.
+
+The actual fail-safe is the try/except wrapper around invoke_with_retry:
+if the Groq API is down or returns an error, tenacity retries 3 times with
+exponential backoff (2s → 4s → 8s). After all retries exhausted, we
+fall back to "full_report" — meaning the user gets a complete pipeline
+rather than an error. The fallback route is the most comprehensive one,
+so even in degraded mode the system remains functional.
+
+The graph itself is immune to single-node failures because each node is
+independent — the supervisor doesn't hold any state, it only routes. If the
+risk_node crashes, only that branch fails; explain_only and premium routes
+that skip risk_node remain healthy.
+
+---
+
+Q2: "You said XGBoost and SHAP are 'tools' the agent uses, not LLMs. Why
+    does that distinction matter architecturally? What goes wrong if you
+    let an LLM do prediction?"
+
+A2:
+This distinction is the core Applied AI engineering principle behind the
+whole system — it's not a stylistic choice.
+
+XGBoost is a gradient-boosted decision tree ensemble. It produces
+prediction probabilities through a mathematically well-defined optimization
+process: it minimizes log-loss over training data via iterative tree
+construction. For the Porto Seguro dataset with ~600k rows and ~26:1 class
+imbalance, XGBoost finds genuine statistical patterns: prior claim
+frequency, vehicle age, engine capacity correlating with claim likelihood.
+
+An LLM, by contrast, has no numeric sense of probability in this sense.
+A language model produces text that *patterns match* training data. If you
+asked GPT-4 or even Groq's 70b to "estimate the claim probability for this
+policy," it would synthesize a plausible-sounding narrative — but it has no
+actual calibrated probability distribution over insurance loss events. It
+might even hallucinate a number that feels right but is statistically
+meaningless. That's dangerous in a regulated industry where IRDAI guidelines
+require explainable underwriting decisions.
+
+The tool use pattern solves this: we delegate the deterministic,
+quantitative task (prediction + attribution) to the tool purpose-built for
+it, and delegate the qualitative, reasoning-heavy tasks (narration,
+recommendation, report writing) to the LLM. The output of the ML tool
+(shap_features with signed float values) becomes structured input to the LLM
+explainer node, which then translates those numbers into plain English.
+
+What goes wrong with LLM-only prediction:
+1. No calibration — LLM "probabilities" aren't bounded [0,1] or sum to 1
+2. Hallucination — LLM might invent factors not present in the data
+3. Non-reproducibility — same input might get different outputs
+4. Regulatory violation — insurance decisions must be explainable and
+   auditable; an LLM blob can't be audited to the feature level
+5. Cost — Groq is cheap but still ~1000x slower than a local XGBoost call
+
+---
+
+Q3: "The InsureIQState is a TypedDict shared across all agent nodes. What
+    are the concurrency and consistency implications of this design? What
+    happens if two requests hit the same policy simultaneously?"
+
+A3:
+This is a great question that separates production systems thinking from
+toy implementations.
+
+The short answer: InsureIQ's StateGraph is designed for SINGLE-REQUEST
+invocation, not shared-state concurrency. Two simultaneous requests to the
+same policy_id would each get their own isolated InsureIQState dict — the
+graph is instantiated per-call, so there's no shared in-memory state.
+
+The longer answer:
+
+1. REQUEST ISOLATION: Each HTTP request to /policies/{id}/run-all creates
+   a fresh InsureIQState dict and calls insureiq_graph.invoke(state) on it.
+   Python's asyncio/FastAPI runs each request in its own task context.
+   The graph object itself (insureiq_graph) is stateless — it's compiled
+   once at module import time. The state dict is passed by value (actually
+   by reference, but mutated in-place only within that single invocation).
+
+2. DATABASE-LEVEL CONCURRENCY: The real shared state is the SQLite database.
+   Two simultaneous risk assessments on the same policy would both:
+   - Read the policy from SQLite (read-committed isolation — no lock)
+   - Run ML independently
+   - Try to INSERT a new RiskPrediction row with the same policy_id FK
+
+   SQLite handles this fine — each INSERT is atomic, and concurrent writes
+   get serialized via SQLite's write-lock. The only anomaly would be if you
+   have a unique constraint on (policy_id, user_id) in RiskPrediction — then
+   one INSERT would fail with a constraint error. The current schema allows
+   multiple RiskPredictions per policy (historical), so this is fine.
+
+3. LLM CACHE RACE: The LLMCache table has a SHA256(cache_key) primary key.
+   Two identical LLM calls racing to write the same cache_key: one INSERT
+   wins, the other gets an integrity error — but both return the same
+   cached value to subsequent callers. The store_cache function handles
+   UPDATE-or-INSERT correctly, so this is safe.
+
+4. BACKGROUND BATCH WORKER: The batch background task runs in FastAPI's
+   BackgroundTasks queue — a single thread pool. Workers process one job_id
+   at a time per worker. Multiple batch jobs can run concurrently if you
+   have multiple Gunicorn workers, but each job has its own db SessionLocal
+   and its own state dict. The job status updates are atomic writes to the
+   BatchJob table, so polling /batch/{job_id}/status always sees a
+   consistent snapshot.
+
+5. PRODUCTION UPGRADE PATH: For high-concurrency production, swap SQLite
+   for PostgreSQL ( Railway provides a PostgreSQL plugin), move the LangGraph
+   state to a Redis-backed checkpointer, and run FastAPI under Gunicorn with
+   multiple workers. LangGraph's MemorySaver or RedisCheckpoint can persist
+   state between supervisor invocations if you wanted to support multi-turn
+   conversations — but that's not needed for InsureIQ's synchronous
+   request-response pattern.

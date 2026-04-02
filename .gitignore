@@ -32,6 +32,16 @@ ENV/
 # Environment variables
 .env
 .env.local
+.env.production
+
+# ML models — never commit trained models
+backend/ml/model_store/*.pkl
+backend/ml/model_store/*.json
+!backend/ml/model_store/.gitkeep
+
+# Training data
+data/
+data_dumps/
 
 # Logs
 *.log

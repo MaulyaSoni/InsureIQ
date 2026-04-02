@@ -11,18 +11,14 @@ FastAPI backend for InsureIQ with:
 ## Project Structure
 
 backend/
-- app/main.py
-- app/config.py
-- app/database.py
-- app/models.py
-- app/schemas.py
-- app/auth.py
-- app/cache.py
-- app/ml.py
-- app/audit.py
-- app/routers/auth.py
-- app/routers/policies.py
-- app/routers/analytics.py
+- main.py
+- config.py
+- database/
+- auth/
+- routers/
+- schemas/
+- ml/
+- middleware/
 - requirements.txt
 - .env.example
 
@@ -49,8 +45,24 @@ ENVIRONMENT=development
 3. Start server:
 
 ```powershell
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cd ..
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Permanent safe options:
+
+```powershell
+# Option A (recommended): launcher script from repo root
+.\start-backend.ps1
+
+# Option B: Python launcher from repo root
+python .\backend\run.py
+```
+
+Important:
+- Use a single colon in ASGI target: `backend.main:app`
+- Never use double colon: `backend.main::app` (this always fails)
+- Do not use `app.main:app`; canonical backend module is `backend.main:app`
 
 4. Open docs:
 - http://localhost:8000/docs
@@ -95,7 +107,7 @@ Protected (JWT bearer required):
 3. Start command:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
+uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 ```
 
 4. Ensure persistent volume if you need durable SQLite beyond ephemeral restarts.

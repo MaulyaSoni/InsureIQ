@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
-from app.main import app
-from app.database import SessionLocal
-from app.models import User, Policy
-from app.auth import create_access_token
+from backend.main import app
+from backend.database.db import SessionLocal
+from backend.database.models import User, Policy
+from backend.auth import create_access_token
 
 client = TestClient(app)
 

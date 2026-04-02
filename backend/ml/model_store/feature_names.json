@@ -1,0 +1,17 @@
+[
+  "vehicle_age_years",
+  "engine_cc_normalised",
+  "idv_normalised",
+  "premium_to_idv_ratio",
+  "prior_claims_binary",
+  "prior_claim_severity",
+  "anti_theft",
+  "is_commercial",
+  "is_rideshare",
+  "parking_risk",
+  "ncb_discount",
+  "mileage_risk",
+  "city_tier",
+  "seating_norm",
+  "duration_months_norm"
+]

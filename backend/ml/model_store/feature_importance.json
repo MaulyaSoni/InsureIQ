@@ -1,0 +1,17 @@
+{
+  "vehicle_age_years": 0.25008147954940796,
+  "engine_cc_normalised": 0.12928196787834167,
+  "idv_normalised": 0.09980770945549011,
+  "premium_to_idv_ratio": 0.06800000369548798,
+  "prior_claims_binary": 0.04068751260638237,
+  "prior_claim_severity": 0.04002689570188522,
+  "anti_theft": 0.041209980845451355,
+  "is_commercial": 0.04102042689919472,
+  "is_rideshare": 0.04146326333284378,
+  "parking_risk": 0.0396258570253849,
+  "ncb_discount": 0.04193996265530586,
+  "mileage_risk": 0.04247768968343735,
+  "city_tier": 0.04196973517537117,
+  "seating_norm": 0.04119426757097244,
+  "duration_months_norm": 0.04121316596865654
+}
