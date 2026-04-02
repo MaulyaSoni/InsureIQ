@@ -96,7 +96,7 @@ c) RESUME BULLET POINT
 • Built an Agentic AI vehicle insurance platform (InsureIQ) using LangGraph
   StateGraph with 5-node Supervisor-Worker architecture; XGBoost (AUC >0.63)
   + SHAP TreeExplainer for claim prediction and feature attribution; Groq
-  LLMs (llama-3.3-70b, mixtral-8x7b, llama-3.1-8b-instant) for risk
+   LLMs (llama-3.3-70b-versatile, openai/gpt-oss-120b, llama-3.1-8b-instant) for risk
   explanation, premium advisory, and report generation; 99th-percentile
   response latency via SQLite LLM response caching; deployed on Railway
   (backend) + Vercel (frontend); processed 1000+ policies in batch mode

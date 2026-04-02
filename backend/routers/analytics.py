@@ -50,9 +50,12 @@ def _groq_or_cache(db: Session, policy_id: str, endpoint: str, prompt: str) -> s
     key = build_cache_key(policy_id, endpoint, settings.groq_model)
     cached = get_cached_response(db, key)
     if cached:
-        return str(cached.get("text", ""))
+        cached_text = str(cached.get("text", ""))
+        if "deterministic fallback explanation" not in cached_text.lower():
+            return cached_text
 
     text = ""
+    used_fallback = False
     if settings.groq_api_key:
         try:
             from groq import Groq
@@ -69,11 +72,14 @@ def _groq_or_cache(db: Session, policy_id: str, endpoint: str, prompt: str) -> s
             text = completion.choices[0].message.content or ""
         except Exception:
             text = "LLM unavailable. Generated deterministic fallback explanation."
+            used_fallback = True
     else:
         text = "LLM key not configured. Generated deterministic fallback explanation."
+        used_fallback = True
 
-    ttl_sec = int(max(1, settings.cache_ttl_hours) * 3600)
-    set_cached_response(db, key, {"text": text}, settings.groq_model, ttl_sec)
+    if not used_fallback:
+        ttl_sec = int(max(1, settings.cache_ttl_hours) * 3600)
+        set_cached_response(db, key, {"text": text}, settings.groq_model, ttl_sec)
     return text
 
 

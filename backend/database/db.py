@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -9,7 +10,8 @@ class Base(DeclarativeBase):
 
 
 def _database_url() -> str:
-    return os.environ.get("DATABASE_URL", "sqlite:///./insureiq.db")
+    default_db = Path(__file__).resolve().parent.parent / "insureiq.db"
+    return os.environ.get("DATABASE_URL", f"sqlite:///{default_db}")
 
 
 connect_args = {"check_same_thread": False} if _database_url().startswith("sqlite") else {}

@@ -1,5 +1,6 @@
 import os
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,7 +23,12 @@ class Settings(BaseSettings):
         str(__import__("pathlib").Path(__file__).resolve().parent / "ml" / "model_store" / "xgb_v1.pkl"),
     )
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+    _backend_env = Path(__file__).resolve().parent / ".env"
+    model_config = SettingsConfigDict(
+        env_file=(str(_backend_env), ".env"),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
 
     def cors_list(self) -> list[str]:
         parts = [p.strip() for p in self.cors_origins.split(",") if p.strip()]

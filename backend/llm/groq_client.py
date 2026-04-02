@@ -14,7 +14,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 GROQ_MODELS = {
     "router": "llama-3.1-8b-instant",
-    "extractor": "mixtral-8x7b-32768",
+    "extractor": "openai/gpt-oss-120b",
     "reasoner": "llama-3.3-70b-versatile",
 }
 

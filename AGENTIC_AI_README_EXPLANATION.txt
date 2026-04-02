@@ -5,7 +5,7 @@ InsureIQ is powered by an Agentic AI architecture built on LangGraph's StateGrap
 
 THE CORE IDEA
 -------------
-Instead of calling a single LLM and hoping for the best, InsureIQ uses a Supervisor-Worker pattern. When you submit a policy for analysis, a Supervisor agent (powered by Groq's llama-3.1-8b-instant) reads the user's query and current system state, then intelligently routes the request to the right specialist agents: the Risk Node (XGBoost + SHAP), the Explainer Node (llama-3.3-70b), the Premium Advisor Node (mixtral-8x7b), and the Report Writer Node.
+Instead of calling a single LLM and hoping for the best, InsureIQ uses a Supervisor-Worker pattern. When you submit a policy for analysis, a Supervisor agent (powered by Groq's llama-3.1-8b-instant) reads the user's query and current system state, then intelligently routes the request to the right specialist agents: the Risk Node (XGBoost + SHAP), the Explainer Node (llama-3.3-70b-versatile), the Premium Advisor Node (openai/gpt-oss-120b), and the Report Writer Node.
 
 PERSISTENT SHARED STATE
 ------------------------

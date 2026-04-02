@@ -57,3 +57,5 @@ package-lock.json
 # OS files
 .DS_Store
 Thumbs.db
+
+mcp_UI_prompt.txt

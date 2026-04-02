@@ -19,7 +19,7 @@ def _extract_inr_values(text: str) -> list[float]:
 def premium_node(state: InsureIQState) -> InsureIQState:
     db = state.get("_db")
     policy_id = state.get("policy_id", "unknown")
-    model_name = "mixtral-8x7b-32768"
+    model_name = "openai/gpt-oss-120b"
     cache_key = make_cache_key(policy_id, "premium_advisory", model_name)
     if db is not None:
         cached = check_cache(cache_key, db)

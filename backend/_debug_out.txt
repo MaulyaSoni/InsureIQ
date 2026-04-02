@@ -1,0 +1,9 @@
+All users: 5
+  - t1@test.com (id=285610f2)
+  - ab@gmail.com (id=383dbb2c)
+  - debug_user_1775135826@example.com (id=09da1de6)
+  - debuguser@example.com (id=25239925)
+  - demo@insureiq.local (id=2892198e)
+All policies: 304
+Demo user found: True
+  Policies: 300, Predictions: 300
