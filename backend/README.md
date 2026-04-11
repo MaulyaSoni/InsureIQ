@@ -90,6 +90,19 @@ Protected (JWT bearer required):
 - `POST /api/modules/policy-pdf-qa` (Module 5)
 - `POST /api/modules/claim-eligibility/turn` (Module 6)
 
+Advanced B2B Features:
+- `GET /api/analytics/geo-heatmap` (Feature 1: Heatmap)
+- `GET /api/analytics/segment-breakdown` (Feature 1: Segments)
+- `GET /api/analytics/insights` (Feature 1: AI Insight)
+- `GET /api/workbench/queue` (Feature 2: Underwriter Queue)
+- `POST /api/workbench/decision/{policy_id}` (Feature 2: UW Decision)
+- `GET /api/fraud/reviews` (Feature 3: Fraud review)
+- `GET /api/fraud/{id}/explain` (Feature 3: AI Explanation)
+- `GET /api/teams/` (Feature 4: Teams list)
+- `POST /api/teams/invite` (Feature 4: Team invite)
+- `GET /api/renewal/upcoming` (Feature 5: Renewals)
+- `POST /api/renewal/{id}/advisory` (Feature 5: Groq Advisory)
+
 ## Notes
 
 - All protected endpoints enforce `Depends(get_current_user)`.

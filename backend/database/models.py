@@ -68,8 +68,12 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    organization_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=True)
+    role: Mapped[str] = mapped_column(String(32), default="ANALYST", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    organization: Mapped["Organization | None"] = relationship(back_populates="members")
 
     policies: Mapped[list["Policy"]] = relationship(back_populates="user")
 
@@ -126,10 +130,72 @@ class RiskPrediction(Base):
     )
     shap_features: Mapped[list] = mapped_column(JSON, nullable=False)
     llm_explanation: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    fraud_flagged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    fraud_signals: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     model_version: Mapped[str] = mapped_column(String(64), default="xgb_v1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     policy: Mapped["Policy"] = relationship(back_populates="risk_predictions")
+
+
+class FraudReview(Base):
+    __tablename__ = "fraud_reviews"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid_str)
+    risk_prediction_id: Mapped[str] = mapped_column(String(36), ForeignKey("risk_predictions.id"), index=True, nullable=False)
+    policy_id: Mapped[str] = mapped_column(String(36), ForeignKey("policies.id"), index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
+    resolution: Mapped[str] = mapped_column(String(32), nullable=False)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class UnderwritingDecision(Base):
+    __tablename__ = "underwriting_decisions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid_str)
+    policy_id: Mapped[str] = mapped_column(String(36), ForeignKey("policies.id"), index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
+    decision: Mapped[str] = mapped_column(String(32), nullable=False)
+    premium_loading_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    decline_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    conditions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_recommendation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    followed_ai: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ReviewQueue(Base):
+    __tablename__ = "review_queue"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid_str)
+    policy_id: Mapped[str] = mapped_column(String(36), ForeignKey("policies.id"), index=True, nullable=False)
+    risk_prediction_id: Mapped[str] = mapped_column(String(36), ForeignKey("risk_predictions.id"), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="PENDING", nullable=False)
+    priority: Mapped[str] = mapped_column(String(16), default="NORMAL", nullable=False)
+    assigned_to: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    due_by: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid_str)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    irdai_registration_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    plan: Mapped[str] = mapped_column(String(32), default="PROFESSIONAL", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    members: Mapped[list["User"]] = relationship(back_populates="organization")
+
+
+class UserRole(str, enum.Enum):
+    ADMIN = "ADMIN"
+    MANAGER = "MANAGER"
+    ANALYST = "ANALYST"
+    VIEWER = "VIEWER"
 
 
 class BatchJob(Base):

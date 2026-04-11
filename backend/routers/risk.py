@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from backend.auth.dependencies import get_current_user
 from backend.database.db import get_db
 from backend.database.models import Policy, RiskBandEnum, RiskPrediction, User
+from backend.ml.fraud_detector import detect_fraud_signals
 from backend.ml.service import build_risk_assessment_out, evaluate_policy_ml
 from backend.schemas.analytics import RiskAssessmentOut
 
@@ -53,6 +54,14 @@ def assess_risk(
     except Exception as exc:
         raise HTTPException(status_code=422, detail={"error": "ML_ERROR", "detail": str(exc)}) from exc
 
+    fraud_signals = detect_fraud_signals(policy, None, db)
+    fraud_signals_data = [
+        {"rule_id": s.rule_id, "severity": s.severity, "description": s.description, "evidence": s.evidence}
+        for s in fraud_signals
+    ]
+    has_high_severity = any(s.severity == "HIGH" for s in fraud_signals)
+    is_fraud_flagged = has_high_severity
+
     now = datetime.utcnow()
     pred_id = str(uuid4())
     rp = RiskPrediction(
@@ -66,6 +75,8 @@ def assess_risk(
         llm_explanation=result["explanation"],
         model_version="xgb_v1",
         created_at=now,
+        fraud_flagged=is_fraud_flagged,
+        fraud_signals=fraud_signals_data,
     )
     db.add(rp)
     db.commit()
@@ -75,6 +86,8 @@ def assess_risk(
         policy_id=policy.id,
         result=result,
         created_at=now,
+        fraud_signals=fraud_signals_data,
+        fraud_flagged=is_fraud_flagged,
     )
 
 

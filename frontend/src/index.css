@@ -1,110 +1,159 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────
+   NEURAL UNDERWRITING — Design Token System
+   Dark Intelligence · Cyan Signal · Agentic Precision
+───────────────────────────────────────────── */
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 220 30% 10%;
+    /* Neural Underwriting always dark-first */
+    --background: 222 26% 5%;
+    --foreground: 220 15% 94%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 30% 10%;
+    --card: 222 22% 9%;
+    --card-foreground: 220 15% 94%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 30% 10%;
+    --popover: 222 22% 11%;
+    --popover-foreground: 220 15% 94%;
 
-    --primary: 220 70% 45%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 188 100% 50%;       /* #00D4FF cyan */
+    --primary-foreground: 222 26% 5%;
 
-    --secondary: 160 50% 40%;
+    --secondary: 220 100% 50%;     /* #0066FF cobalt */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 15% 92%;
+    --muted: 222 20% 13%;
     --muted-foreground: 220 10% 45%;
 
-    --accent: 35 90% 55%;
-    --accent-foreground: 220 30% 10%;
+    --accent: 222 20% 16%;
+    --accent-foreground: 220 15% 94%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 348 100% 60%;   /* #FF3B5C danger */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 88%;
-    --input: 220 15% 88%;
-    --ring: 220 70% 45%;
+    --border: 222 18% 16%;
+    --input: 222 20% 11%;
+    --ring: 188 100% 50%;
 
-    --radius: 0.625rem;
+    --radius: 0.5rem;
 
-    --sidebar-background: 220 30% 12%;
-    --sidebar-foreground: 220 10% 85%;
-    --sidebar-primary: 220 70% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 18%;
-    --sidebar-accent-foreground: 220 10% 90%;
-    --sidebar-border: 220 20% 20%;
-    --sidebar-ring: 220 70% 55%;
+    /* Sidebar — darkest panel */
+    --sidebar-background: 222 30% 5%;
+    --sidebar-foreground: 220 10% 75%;
+    --sidebar-primary: 188 100% 50%;
+    --sidebar-primary-foreground: 222 30% 5%;
+    --sidebar-accent: 222 22% 10%;
+    --sidebar-accent-foreground: 220 15% 94%;
+    --sidebar-border: 222 18% 14%;
+    --sidebar-ring: 188 100% 50%;
 
-    --success: 160 60% 40%;
+    /* Semantic */
+    --success: 145 100% 45%;       /* #00E676 */
     --success-foreground: 0 0% 100%;
-    --warning: 35 90% 55%;
-    --warning-foreground: 220 30% 10%;
-    --info: 200 80% 50%;
-    --info-foreground: 0 0% 100%;
+    --warning: 43 100% 50%;        /* #FFB300 */
+    --warning-foreground: 222 26% 5%;
+    --info: 188 100% 50%;
+    --info-foreground: 222 26% 5%;
 
-    --risk-low: 160 60% 40%;
-    --risk-medium: 35 90% 55%;
-    --risk-high: 0 72% 51%;
-    --risk-critical: 0 85% 40%;
+    /* Risk bands */
+    --risk-low: 145 100% 45%;
+    --risk-medium: 43 100% 50%;
+    --risk-high: 25 100% 50%;
+    --risk-critical: 348 100% 60%;
+
+    /* Cyan / cobalt direct values */
+    --cyan: #00D4FF;
+    --cobalt: #0066FF;
+    --danger: #FF3B5C;
+    --nu-bg: #07080D;
+    --nu-surface: #0E1118;
+    --nu-elevated: #161B27;
+    --nu-border: #1E2535;
+  }
+
+  /* Light mode — keep dark by default for Neural Underwriting */
+  .light {
+    --background: 222 26% 5%;
+    --foreground: 220 15% 94%;
+    --card: 222 22% 9%;
+    --card-foreground: 220 15% 94%;
+    --popover: 222 22% 11%;
+    --popover-foreground: 220 15% 94%;
+    --primary: 188 100% 50%;
+    --primary-foreground: 222 26% 5%;
+    --secondary: 220 100% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 222 20% 13%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 222 20% 16%;
+    --accent-foreground: 220 15% 94%;
+    --destructive: 348 100% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 18% 16%;
+    --input: 222 20% 11%;
+    --ring: 188 100% 50%;
+    --sidebar-background: 222 30% 5%;
+    --sidebar-foreground: 220 10% 75%;
+    --sidebar-primary: 188 100% 50%;
+    --sidebar-primary-foreground: 222 30% 5%;
+    --sidebar-accent: 222 22% 10%;
+    --sidebar-accent-foreground: 220 15% 94%;
+    --sidebar-border: 222 18% 14%;
+    --sidebar-ring: 188 100% 50%;
+    --success: 145 100% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 43 100% 50%;
+    --warning-foreground: 222 26% 5%;
+    --info: 188 100% 50%;
+    --info-foreground: 222 26% 5%;
+    --risk-low: 145 100% 45%;
+    --risk-medium: 43 100% 50%;
+    --risk-high: 25 100% 50%;
+    --risk-critical: 348 100% 60%;
   }
 
   .dark {
-    --background: 220 25% 8%;
-    --foreground: 220 10% 92%;
-
-    --card: 220 25% 12%;
-    --card-foreground: 220 10% 92%;
-
-    --popover: 220 25% 12%;
-    --popover-foreground: 220 10% 92%;
-
-    --primary: 220 70% 55%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 160 50% 45%;
+    --background: 222 26% 5%;
+    --foreground: 220 15% 94%;
+    --card: 222 22% 9%;
+    --card-foreground: 220 15% 94%;
+    --popover: 222 22% 11%;
+    --popover-foreground: 220 15% 94%;
+    --primary: 188 100% 50%;
+    --primary-foreground: 222 26% 5%;
+    --secondary: 220 100% 50%;
     --secondary-foreground: 0 0% 100%;
-
-    --muted: 220 20% 18%;
-    --muted-foreground: 220 10% 60%;
-
-    --accent: 35 90% 55%;
-    --accent-foreground: 220 30% 10%;
-
-    --destructive: 0 62% 40%;
+    --muted: 222 20% 13%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 222 20% 16%;
+    --accent-foreground: 220 15% 94%;
+    --destructive: 348 100% 60%;
     --destructive-foreground: 0 0% 100%;
-
-    --border: 220 20% 20%;
-    --input: 220 20% 20%;
-    --ring: 220 70% 55%;
-
-    --sidebar-background: 220 30% 6%;
-    --sidebar-foreground: 220 10% 85%;
-    --sidebar-primary: 220 70% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 14%;
-    --sidebar-accent-foreground: 220 10% 90%;
-    --sidebar-border: 220 20% 15%;
-    --sidebar-ring: 220 70% 55%;
-
-    --success: 160 60% 45%;
+    --border: 222 18% 16%;
+    --input: 222 20% 11%;
+    --ring: 188 100% 50%;
+    --sidebar-background: 222 30% 5%;
+    --sidebar-foreground: 220 10% 75%;
+    --sidebar-primary: 188 100% 50%;
+    --sidebar-primary-foreground: 222 30% 5%;
+    --sidebar-accent: 222 22% 10%;
+    --sidebar-accent-foreground: 220 15% 94%;
+    --sidebar-border: 222 18% 14%;
+    --sidebar-ring: 188 100% 50%;
+    --success: 145 100% 45%;
     --success-foreground: 0 0% 100%;
-    --warning: 35 90% 55%;
-    --warning-foreground: 220 30% 10%;
-    --info: 200 80% 55%;
-    --info-foreground: 0 0% 100%;
-
-    --risk-low: 160 60% 45%;
-    --risk-medium: 35 90% 55%;
-    --risk-high: 0 72% 55%;
-    --risk-critical: 0 85% 45%;
+    --warning: 43 100% 50%;
+    --warning-foreground: 222 26% 5%;
+    --info: 188 100% 50%;
+    --info-foreground: 222 26% 5%;
+    --risk-low: 145 100% 45%;
+    --risk-medium: 43 100% 50%;
+    --risk-high: 25 100% 50%;
+    --risk-critical: 348 100% 60%;
   }
 }
 
@@ -112,7 +161,571 @@
   * {
     @apply border-border;
   }
+  html {
+    color-scheme: dark;
+  }
   body {
     @apply bg-background text-foreground;
+    font-family: 'DM Sans', sans-serif;
+    background-color: #07080D;
+    color: #F0F4FF;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   TYPOGRAPHY CLASSES
+───────────────────────────────────────────── */
+.font-mono-ibm  { font-family: 'IBM Plex Mono', monospace; }
+.font-roboto-mono { font-family: 'Roboto Mono', monospace; }
+.font-dm-sans   { font-family: 'DM Sans', sans-serif; }
+
+/* ─────────────────────────────────────────────
+   NEURAL UNDERWRITING COMPONENT SYSTEM
+───────────────────────────────────────────── */
+@layer components {
+
+  /* ── Cards ── */
+  .nu-card {
+    background-color: #0E1118;
+    border: 1px solid #1E2535;
+    border-radius: 8px;
+    transition: border-color 150ms ease;
+  }
+  .nu-card:hover {
+    border-color: #2E3A50;
+  }
+  .nu-card-elevated {
+    background-color: #161B27;
+    border: 1px solid #1E2535;
+    border-radius: 8px;
+  }
+  .nu-card-ai {
+    background-color: #0E1118;
+    border: 1px solid #1E2535;
+    border-left: 3px solid #00D4FF;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.04);
+  }
+  .nu-card-danger {
+    background-color: #0E1118;
+    border: 1px solid #1E2535;
+    border-left: 3px solid #FF3B5C;
+    border-radius: 8px;
+  }
+
+  /* ── Buttons ── */
+  .nu-btn-primary {
+    background-color: #0066FF;
+    color: #ffffff;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 150ms ease, transform 100ms ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .nu-btn-primary:hover {
+    background-color: #0055DD;
+    transform: translateY(-1px);
+  }
+  .nu-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .nu-btn-ghost {
+    background-color: transparent;
+    color: #8A95B0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: 1px solid #1E2535;
+    cursor: pointer;
+    transition: border-color 150ms ease, color 150ms ease;
+  }
+  .nu-btn-ghost:hover {
+    border-color: #00D4FF;
+    color: #00D4FF;
+  }
+  .nu-btn-cyan {
+    background-color: transparent;
+    color: #00D4FF;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: 1px solid #00D4FF;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+  }
+  .nu-btn-cyan:hover {
+    background-color: rgba(0, 212, 255, 0.1);
+  }
+
+  /* ── Inputs ── */
+  .nu-input {
+    background-color: #111622;
+    border: 1px solid #1E2535;
+    border-radius: 6px;
+    color: #F0F4FF;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    width: 100%;
+    outline: none;
+    transition: border-color 150ms ease;
+  }
+  .nu-input:focus {
+    border-color: #00D4FF;
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1);
+  }
+  .nu-input::placeholder {
+    color: #485068;
+  }
+  .nu-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8A95B0;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .nu-select {
+    background-color: #111622;
+    border: 1px solid #1E2535;
+    border-radius: 6px;
+    color: #F0F4FF;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    width: 100%;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A95B0' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+  .nu-select:focus {
+    border-color: #00D4FF;
+  }
+
+  /* ── Risk Badges ── */
+  .risk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .risk-badge-low {
+    background-color: rgba(0, 230, 118, 0.1);
+    border: 1px solid rgba(0, 230, 118, 0.3);
+    color: #00E676;
+  }
+  .risk-badge-medium {
+    background-color: rgba(255, 179, 0, 0.1);
+    border: 1px solid rgba(255, 179, 0, 0.3);
+    color: #FFB300;
+  }
+  .risk-badge-high {
+    background-color: rgba(255, 100, 0, 0.1);
+    border: 1px solid rgba(255, 100, 0, 0.3);
+    color: #FF6400;
+  }
+  .risk-badge-critical {
+    background-color: rgba(255, 59, 92, 0.12);
+    border: 1px solid rgba(255, 59, 92, 0.35);
+    color: #FF3B5C;
+  }
+
+  /* ── Agent Status Bar ── */
+  .agent-status-bar {
+    height: 36px;
+    background-color: #0A0C14;
+    border-bottom: 1px solid #1E2535;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 8px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11px;
+    color: #00D4FF;
+  }
+  .agent-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #00D4FF;
+    animation: agentPulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes agentPulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,212,255,0.4); }
+    50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(0,212,255,0); }
+  }
+
+  /* ── Floating AI Chat FAB ── */
+  .ai-fab {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 100;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background-color: #0E1118;
+    border: 2px solid #00D4FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 200ms ease, box-shadow 200ms ease;
+    box-shadow: 0 0 16px rgba(0, 212, 255, 0.2);
+  }
+  .ai-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 28px rgba(0, 212, 255, 0.4);
+  }
+  .ai-fab-ring {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    animation: fabRing 2.5s ease-in-out infinite;
+  }
+  @keyframes fabRing {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.15); opacity: 0; }
+  }
+
+  /* ── Agent Status Floating Chip ── */
+  .agent-chip {
+    position: fixed;
+    bottom: 92px;
+    right: 28px;
+    z-index: 99;
+    background: linear-gradient(135deg, #0E1118 0%, #161B27 100%);
+    border: 1px solid #1E2535;
+    border-radius: 24px;
+    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 10px;
+    color: #00D4FF;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ── AI Chat Drawer ── */
+  .ai-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 400px;
+    z-index: 200;
+    background-color: #0A0C14;
+    border-left: 1px solid #1E2535;
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .ai-drawer.open {
+    transform: translateX(0);
+  }
+  .ai-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 199;
+    background-color: rgba(7, 8, 13, 0.7);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 300ms ease;
+  }
+  .ai-drawer-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ── Tables ── */
+  .nu-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+  }
+  .nu-table th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #485068;
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid #1E2535;
+  }
+  .nu-table td {
+    padding: 13px 16px;
+    border-bottom: 1px solid #1E2535;
+    color: #8A95B0;
+    vertical-align: middle;
+  }
+  .nu-table tbody tr {
+    position: relative;
+    transition: background-color 150ms ease;
+  }
+  .nu-table tbody tr:hover {
+    background-color: #111622;
+  }
+  .nu-table tbody tr:hover td:first-child {
+    border-left: 3px solid #00D4FF;
+    padding-left: 13px;
+  }
+
+  /* ── KPI Cards ── */
+  .kpi-card {
+    background-color: #0E1118;
+    border: 1px solid #1E2535;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: border-color 150ms ease, transform 150ms ease;
+  }
+  .kpi-card:hover {
+    border-color: #2E3A50;
+    transform: translateY(-2px);
+  }
+  .kpi-number {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 28px;
+    font-weight: 600;
+    color: #F0F4FF;
+    line-height: 1;
+  }
+  .kpi-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #485068;
+  }
+  .kpi-trend {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11px;
+  }
+  .kpi-trend-up { color: #FF3B5C; }
+  .kpi-trend-down { color: #00E676; }
+  .kpi-trend-neutral { color: #8A95B0; }
+
+  /* ── Page Header ── */
+  .nu-page-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 24px;
+    font-weight: 600;
+    color: #F0F4FF;
+    letter-spacing: -0.01em;
+  }
+  .nu-page-subtitle {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: #8A95B0;
+    margin-top: 4px;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track { background: #0A0C14; }
+  ::-webkit-scrollbar-thumb { background: #1E2535; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2E3A50; }
+
+  /* ── Shimmer animation ── */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .nu-shimmer {
+    background: linear-gradient(90deg, #161B27 25%, #1E2535 50%, #161B27 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* ── Stagger animation ── */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .stagger-1 { animation: fadeInUp 0.3s ease 0.04s both; }
+  .stagger-2 { animation: fadeInUp 0.3s ease 0.08s both; }
+  .stagger-3 { animation: fadeInUp 0.3s ease 0.12s both; }
+  .stagger-4 { animation: fadeInUp 0.3s ease 0.16s both; }
+  .stagger-5 { animation: fadeInUp 0.3s ease 0.20s both; }
+  .stagger-6 { animation: fadeInUp 0.3s ease 0.24s both; }
+
+  /* ── Utility ── */
+  .nu-divider {
+    border: none;
+    border-top: 1px solid #1E2535;
+    margin: 0;
+  }
+  .nu-mono-value {
+    font-family: 'Roboto Mono', monospace;
+    color: #F0F4FF;
+  }
+  .nu-muted {
+    color: #8A95B0;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+  }
+  .nu-cyan { color: #00D4FF; }
+  .nu-cobalt { color: #0066FF; }
+  .nu-danger { color: #FF3B5C; }
+  .nu-warning { color: #FFB300; }
+  .nu-success { color: #00E676; }
+
+  /* ── SHAP bars ── */
+  .shap-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .shap-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: #8A95B0;
+    width: 160px;
+    flex-shrink: 0;
+  }
+  .shap-bar-track {
+    flex: 1;
+    height: 6px;
+    background-color: #1E2535;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .shap-bar-fill-pos {
+    height: 100%;
+    background-color: #0066FF;
+    border-radius: 3px;
+    transition: width 600ms ease;
+  }
+  .shap-bar-fill-neg {
+    height: 100%;
+    background-color: #FF3B5C;
+    border-radius: 3px;
+    transition: width 600ms ease;
+  }
+  .shap-value {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11px;
+    width: 48px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── Agent Trace ── */
+  .agent-trace-node {
+    background-color: #161B27;
+    border: 1px solid #1E2535;
+    border-radius: 8px;
+    padding: 12px 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .agent-trace-node.complete {
+    border-color: rgba(0, 230, 118, 0.3);
+  }
+  .agent-trace-node.running {
+    border-color: rgba(0, 212, 255, 0.4);
+    box-shadow: 0 0 12px rgba(0, 212, 255, 0.08);
+  }
+  .agent-trace-arrow {
+    color: #1E2535;
+    font-size: 20px;
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  /* ── ReAct trace timeline ── */
+  .react-step {
+    position: relative;
+    padding-left: 24px;
+    padding-bottom: 16px;
+  }
+  .react-step::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 16px;
+    bottom: 0;
+    width: 1px;
+    background-color: #1E2535;
+  }
+  .react-step:last-child::before { display: none; }
+  .react-step-dot {
+    position: absolute;
+    left: 0;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #00D4FF;
+    background-color: #07080D;
+    flex-shrink: 0;
+  }
+  .react-step-type {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #00D4FF;
+    margin-bottom: 3px;
+  }
+  .react-step-content {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: #8A95B0;
+  }
+  .react-step-code {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11px;
+    color: #00D4FF;
+    background-color: rgba(0, 212, 255, 0.05);
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
   }
 }

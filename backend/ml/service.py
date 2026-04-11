@@ -56,6 +56,8 @@ def build_risk_assessment_out(
     policy_id: str,
     result: dict[str, Any],
     created_at,
+    fraud_signals: list[dict] | None = None,
+    fraud_flagged: bool = False,
 ) -> RiskAssessmentOut:
     return RiskAssessmentOut(
         id=pred_id,
@@ -67,6 +69,8 @@ def build_risk_assessment_out(
         explanation=result["explanation"],
         agent_type="risk_scoring",
         created_at=created_at,
+        fraud_signals=fraud_signals or [],
+        fraud_flagged=fraud_flagged,
     )
 
 

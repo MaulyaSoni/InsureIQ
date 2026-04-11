@@ -92,16 +92,36 @@ export const updatePolicy = (id: string, data: Record<string, unknown>) =>
 export const deletePolicy = (id: string) =>
   request(`/policies/${id}`, { method: "DELETE" });
 
-export const runAllAnalysis = (id: string) =>
-  request(`/policies/${id}/run-all`, { method: "POST" });
+export const runAllAnalysis = async (id: string) => {
+  const analysis = await request(`/policies/${id}/run-all`, { method: "POST" });
+  let base: any = null;
+  try {
+    base = await getPolicy(id);
+  } catch {
+    base = { id };
+  }
+
+  const risk = analysis?.risk || {};
+  const premium = analysis?.premium || {};
+
+  return {
+    ...base,
+    ...analysis,
+    risk_score: Number(risk.risk_score ?? base?.risk_score ?? 0),
+    risk_band: String(risk.risk_band ?? base?.risk_band ?? "LOW"),
+    claim_probability: Number(risk.claim_probability ?? base?.claim_probability ?? 0) * 100,
+    risk_factors: Array.isArray(risk.shap_features) ? risk.shap_features : (base?.risk_factors || []),
+    premium_amount: Number(premium.premium_max ?? base?.premium_amount ?? 0),
+  };
+};
 
 // --- Risk Assessment ---
 export const assessRisk = (policyId: string) =>
-  request("/risk-scoring", { method: "POST", body: JSON.stringify({ policy_id: policyId }) });
+  request("/risk/assess", { method: "POST", body: JSON.stringify({ policy_id: policyId }) });
 
 // --- Claim Prediction ---
 export const predictClaim = async (policyId: string) => {
-  const res = await request("/claim-prediction", {
+  const res = await request("/claims/predict", {
     method: "POST",
     body: JSON.stringify({ policy_id: policyId }),
   });
@@ -126,7 +146,7 @@ export const checkClaimEligibility = (data: Record<string, unknown>) =>
 
 // --- Premium Advisory ---
 export const advisePremium = async (policyId: string) => {
-  const res = await request("/premium-advisory", {
+  const res = await request("/premium/advise", {
     method: "POST",
     body: JSON.stringify({ policy_id: policyId }),
   });
@@ -156,17 +176,54 @@ export const whatIfPremium = (policyId: string, adjustments: Record<string, unkn
 
 // --- Reports ---
 export const generateReport = async (policyId: string) => {
-  const res = await request("/report", {
+  const res = await request("/reports/generate", {
     method: "POST",
     body: JSON.stringify({ policy_id: policyId }),
   });
 
+  const riskScore = Number(res.risk_score ?? 0);
+  const claimProbability = Number(res.claim_probability ?? 0);
+  const currentPremium = Number(res.current_premium ?? 0);
+  const premiumMin = Number(res.premium_min ?? currentPremium);
+  const premiumMax = Number(res.premium_max ?? premiumMin);
+
   return {
     id: res.id || res.report_id || `rpt-${Date.now()}`,
     policy_id: res.policy_id || policyId,
-    risk_assessment: res.risk_assessment,
-    claim_prediction: res.claim_prediction,
-    premium_advisory: res.premium_advisory,
+    risk_assessment: res.risk_assessment || {
+      id: `ra-${Date.now()}`,
+      policy_id: res.policy_id || policyId,
+      risk_score: riskScore,
+      risk_band: String(res.risk_band || "medium").toLowerCase(),
+      claim_probability: claimProbability,
+      top_features: [],
+      explanation: String(res.content || "No explanation available."),
+      agent_type: "report_writer",
+      created_at: new Date().toISOString(),
+    },
+    claim_prediction: res.claim_prediction || {
+      id: `cp-${Date.now()}`,
+      policy_id: res.policy_id || policyId,
+      claim_probability: claimProbability,
+      predicted_claim_amount: Number(res.predicted_claim_amount || 0),
+      confidence_interval: {
+        lower: Number(res.confidence_interval?.lower || 0),
+        upper: Number(res.confidence_interval?.upper || 0),
+      },
+      risk_factors: Array.isArray(res.risk_factors) ? res.risk_factors : [],
+      model_version: res.model_version || "xgb_v1",
+      created_at: new Date().toISOString(),
+    },
+    premium_advisory: res.premium_advisory || {
+      id: `pa-${Date.now()}`,
+      policy_id: res.policy_id || policyId,
+      current_premium: currentPremium,
+      recommended_premium: premiumMax,
+      premium_range: { min: premiumMin, max: premiumMax },
+      adjustment_factors: Array.isArray(res.adjustment_factors) ? res.adjustment_factors : [],
+      justification: String(res.premium_narrative || "No premium justification available."),
+      created_at: new Date().toISOString(),
+    },
     summary: res.summary || res.content || "No summary available.",
     recommendation: (res.recommendation || "review").toLowerCase(),
     generated_at: res.generated_at || new Date().toISOString(),
@@ -182,31 +239,41 @@ export const downloadReportPDF = (reportId: string) => {
 
 // --- Batch ---
 export const submitBatchAnalysis = (data: Record<string, unknown>) =>
-  request("/batch", { method: "POST", body: JSON.stringify(data) });
+  request("/batch/run", { method: "POST", body: JSON.stringify(data) });
 
 export const getBatchStatus = (jobId: string) =>
   request(`/batch/${jobId}/status`);
 
 export const runBatchAnalysis = async (policyIds: string[]) => {
-  const result = await request("/batch", {
+  const result = await request("/batch/run", {
     method: "POST",
     body: JSON.stringify({ policy_ids: policyIds }),
   });
 
+  let status = await getBatchStatus(result.id);
+  let attempts = 0;
+  while (status?.status !== "completed" && status?.status !== "failed" && attempts < 20) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    status = await getBatchStatus(result.id);
+    attempts += 1;
+  }
+
+  const finalResult = await request(`/batch/${result.id}/results`);
+
   return {
-    id: result.id,
-    name: result.name || "Portfolio Batch Analysis",
-    total_policies: result.total_policies,
-    processed: result.processed,
-    status: result.status,
-    created_at: result.created_at || new Date().toISOString(),
-    completed_at: result.completed_at,
-    results_summary: result.results_summary,
+    id: finalResult.id || result.id,
+    name: finalResult.name || result.name || "Portfolio Batch Analysis",
+    total_policies: Number(finalResult.total_policies || result.total_policies || policyIds.length),
+    processed: Number(finalResult.processed_count || status?.processed_count || 0),
+    status: finalResult.status || status?.status || result.status,
+    created_at: finalResult.created_at || result.created_at || new Date().toISOString(),
+    completed_at: finalResult.completed_at,
+    results_summary: finalResult.results_summary || {},
   };
 };
 
 export const getDashboardStats = async () => {
-  const kpis = await request("/dashboard/stats");
+  const kpis = await request("/dashboard/kpis");
   const totalPolicies = Number(kpis.total_policies || 0);
 
   return {
@@ -216,7 +283,7 @@ export const getDashboardStats = async () => {
     high_risk_percentage: Number(kpis.high_risk_percentage || 0),
     total_insured_value: Number(kpis.total_insured_value || 0),
     total_premium: Number(kpis.total_premium || 0),
-    claims_predicted: Number(kpis.claims_predicted || 0),
+    claims_predicted: Number(kpis.claims_predicted || kpis.claims_predicted_this_month || 0),
     reports_generated: Number(kpis.reports_generated || 0),
   };
 };

@@ -13,6 +13,13 @@ class SHAPFeature(BaseModel):
     direction: Literal["positive", "negative"]
 
 
+class FraudSignalSchema(BaseModel):
+    rule_id: str
+    severity: Literal["LOW", "MEDIUM", "HIGH"]
+    description: str
+    evidence: dict
+
+
 class RiskAssessmentOut(BaseModel):
     id: str
     policy_id: str
@@ -23,6 +30,8 @@ class RiskAssessmentOut(BaseModel):
     explanation: str
     agent_type: Literal["risk_scoring"] = "risk_scoring"
     created_at: datetime
+    fraud_signals: list[FraudSignalSchema] = []
+    fraud_flagged: bool = False
 
 
 class ClaimPredictionOut(BaseModel):

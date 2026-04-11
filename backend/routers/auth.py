@@ -46,7 +46,16 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
 @router.post("/login", response_model=AuthResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email.lower().strip()).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
+
+    password_ok = False
+    if user:
+        try:
+            password_ok = verify_password(payload.password, user.hashed_password)
+        except Exception:
+            # Treat invalid/legacy hash formats as bad credentials, not server errors.
+            password_ok = False
+
+    if not user or not password_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": "HTTP_ERROR", "detail": "Invalid credentials"},

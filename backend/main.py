@@ -12,15 +12,20 @@ from backend.middleware.audit_middleware import AuditMiddleware
 from backend.ml.predictor import load_model
 from backend.routers import (
     analytics,
+    audit_log,
     auth,
     batch,
     claims,
     dashboard,
+    fraud,
     modules,
     policies,
     premium,
     reports,
     risk,
+    renewal,
+    teams,
+    workbench,
 )
 
 settings = get_settings()
@@ -80,6 +85,7 @@ def health():
         "model_loaded": getattr(app.state, "model_loaded", False),
         "db_connected": db_ok,
         "groq_key_present": bool(settings.groq_api_key),
+        "modules_loaded": ["fraud", "renewal", "workbench", "analytics", "teams"],
     }
 
 
@@ -87,9 +93,14 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(policies.router, prefix="/api")
 app.include_router(risk.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
+app.include_router(audit_log.router, prefix="/api")
 app.include_router(batch.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(modules.router, prefix="/api")
 app.include_router(claims.router, prefix="/api")
 app.include_router(premium.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
+app.include_router(fraud.router, prefix="/api")
+app.include_router(workbench.router, prefix="/api")
+app.include_router(renewal.router, prefix="/api")
+app.include_router(teams.router, prefix="/api")

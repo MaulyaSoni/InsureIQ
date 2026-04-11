@@ -1,265 +1,573 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getDashboardStats } from "@/lib/api";
-import type { DashboardStats } from "@/types/insurance";
+import { Link } from "react-router-dom";
+import RenewalTab from "@/components/RenewalTab";
 import {
-  ShieldAlert,
   FileText,
-  TrendingUp,
-  IndianRupee,
+  ShieldAlert,
   AlertTriangle,
+  Bell,
+  TrendingUp,
   BarChart3,
-  Layers,
-  CheckCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  RefreshCw,
+  Zap,
 } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, Legend,
-} from "recharts";
+import { getDashboardStats, getPolicies } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
 
-const RISK_COLORS = ["hsl(160,60%,40%)", "hsl(35,90%,55%)", "hsl(0,72%,51%)", "hsl(0,85%,40%)"];
+const RISK_COLORS: Record<string, string> = {
+  LOW: "#00E676",
+  MEDIUM: "#FFB300",
+  HIGH: "#FF6400",
+  CRITICAL: "#FF3B5C",
+};
 
-const riskTrendData = [
-  { date: "Jan 1", avgScore: 38, low: 12, medium: 5, high: 2, critical: 1 },
-  { date: "Jan 15", avgScore: 42, low: 10, medium: 7, high: 3, critical: 1 },
-  { date: "Feb 1", avgScore: 40, low: 14, medium: 6, high: 2, critical: 2 },
-  { date: "Feb 15", avgScore: 45, low: 11, medium: 8, high: 4, critical: 1 },
-  { date: "Mar 1", avgScore: 43, low: 16, medium: 7, high: 3, critical: 2 },
-  { date: "Mar 15", avgScore: 48, low: 13, medium: 9, high: 5, critical: 2 },
-  { date: "Apr 1", avgScore: 44, low: 15, medium: 8, high: 3, critical: 1 },
-  { date: "Apr 15", avgScore: 46, low: 14, medium: 10, high: 4, critical: 2 },
-  { date: "May 1", avgScore: 50, low: 18, medium: 9, high: 5, critical: 3 },
-  { date: "May 15", avgScore: 47, low: 16, medium: 11, high: 4, critical: 2 },
-  { date: "Jun 1", avgScore: 52, low: 20, medium: 10, high: 6, critical: 3 },
-  { date: "Jun 15", avgScore: 49, low: 18, medium: 12, high: 5, critical: 2 },
-];
+function RiskBadge({ band }: { band: string }) {
+  const b = (band || "LOW").toUpperCase();
+  const cls =
+    b === "CRITICAL"
+      ? "risk-badge risk-badge-critical"
+      : b === "HIGH"
+      ? "risk-badge risk-badge-high"
+      : b === "MEDIUM"
+      ? "risk-badge risk-badge-medium"
+      : "risk-badge risk-badge-low";
+  return <span className={cls}>● {b}</span>;
+}
 
-const premiumTrendData = [
-  { month: "Jan", collected: 245000, recommended: 268000 },
-  { month: "Feb", collected: 312000, recommended: 340000 },
-  { month: "Mar", collected: 298000, recommended: 325000 },
-  { month: "Apr", collected: 356000, recommended: 378000 },
-  { month: "May", collected: 420000, recommended: 455000 },
-  { month: "Jun", collected: 385000, recommended: 412000 },
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  trend,
+  trendUp,
+  color,
+  delay,
+}: {
+  icon: any;
+  label: string;
+  value: string | number;
+  trend: string;
+  trendUp: boolean | null;
+  color: string;
+  delay: number;
+}) {
+  return (
+    <div
+      className="kpi-card"
+      style={{ animation: `fadeInUp 0.35s ease ${delay}ms both` }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            backgroundColor: color + "18",
+            border: `1px solid ${color}30`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon size={16} color={color} />
+        </div>
+        <div
+          className={`kpi-trend ${
+            trendUp === null ? "kpi-trend-neutral" : trendUp ? "kpi-trend-up" : "kpi-trend-down"
+          }`}
+          style={{ display: "flex", alignItems: "center", gap: 3 }}
+        >
+          {trendUp !== null &&
+            (trendUp ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />)}
+          {trend}
+        </div>
+      </div>
+      <div>
+        <div className="kpi-number">{value}</div>
+        <div className="kpi-label" style={{ marginTop: 4 }}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+const AGENT_RUNS = [
+  { id: "IQ-00247", holder: "Rajesh Kumar", nodes: "supervisor→risk→explainer→report", model: "llama-3.3-70b", time: "2 min ago", band: "HIGH" },
+  { id: "IQ-00248", holder: "Priya Sharma", nodes: "supervisor→risk→report", model: "llama-3.1-8b", time: "5 min ago", band: "LOW" },
+  { id: "IQ-00249", holder: "Amit Patel", nodes: "supervisor→risk→explainer", model: "llama-3.3-70b", time: "18 min ago", band: "CRITICAL" },
+  { id: "IQ-00250", holder: "Sunita Rao", nodes: "supervisor→risk→report", model: "llama-3.1-8b", time: "1 hr ago", band: "MEDIUM" },
 ];
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const { user } = useAuth();
+  const [stats, setStats] = useState<any>(null);
+  const [policies, setPolicies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("feed");
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  })();
 
   useEffect(() => {
-    getDashboardStats().then(setStats);
+    (async () => {
+      try {
+        const [s, p] = await Promise.all([getDashboardStats(), getPolicies()]);
+        setStats(s);
+        setPolicies(p.slice(0, 5));
+      } catch {
+        toast.error("Failed to load dashboard data");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  if (!stats) return <div className="flex items-center justify-center h-96 text-muted-foreground">Loading...</div>;
-
-  const statCards = [
-    { label: "Total Policies", value: stats.total_policies, icon: FileText, color: "text-primary" },
-    { label: "Avg Risk Score", value: `${stats.avg_risk_score}/100`, icon: ShieldAlert, color: "text-warning" },
-    { label: "High Risk %", value: `${stats.high_risk_percentage}%`, icon: AlertTriangle, color: "text-destructive" },
-    { label: "Total Assessed", value: stats.total_assessed, icon: CheckCircle, color: "text-success" },
-    { label: "Claims Predicted", value: stats.claims_predicted, icon: TrendingUp, color: "text-info" },
-    { label: "Reports Generated", value: stats.reports_generated, icon: BarChart3, color: "text-primary" },
-    { label: "Total Insured", value: `₹${(stats.total_insured_value / 100000).toFixed(1)}L`, icon: Layers, color: "text-secondary" },
-    { label: "Total Premium", value: `₹${(stats.total_premium / 1000).toFixed(0)}K`, icon: IndianRupee, color: "text-success" },
-  ];
-
-  const riskData = [
-    { name: "Low", value: 2 },
-    { name: "Medium", value: 2 },
-    { name: "High", value: 1 },
-    { name: "Critical", value: 1 },
-  ];
-
-  const monthlyData = [
-    { month: "Jan", policies: 12, claims: 2 },
-    { month: "Feb", policies: 18, claims: 3 },
-    { month: "Mar", policies: 25, claims: 4 },
-    { month: "Apr", policies: 20, claims: 2 },
-    { month: "May", policies: 30, claims: 5 },
-    { month: "Jun", policies: 22, claims: 3 },
+  const kpis = [
+    {
+      icon: FileText,
+      label: "Total Policies",
+      value: stats?.total_policies ?? "—",
+      trend: "+12 this month",
+      trendUp: true,
+      color: "#00D4FF",
+    },
+    {
+      icon: BarChart3,
+      label: "Avg Risk Score",
+      value: stats?.avg_risk_score ? Number(stats.avg_risk_score).toFixed(1) : "—",
+      trend: "+2.1 pts",
+      trendUp: true,
+      color: "#FFB300",
+    },
+    {
+      icon: ShieldAlert,
+      label: "High Risk Count",
+      value: stats?.total_assessed ?? "—",
+      trend: "+5 flagged",
+      trendUp: true,
+      color: "#FF6400",
+    },
+    {
+      icon: AlertTriangle,
+      label: "Critical Alerts",
+      value: loading ? "—" : 7,
+      trend: "−2 resolved",
+      trendUp: false,
+      color: "#FF3B5C",
+    },
+    {
+      icon: TrendingUp,
+      label: "Claims Predicted",
+      value: stats?.claims_predicted ?? "—",
+      trend: "+8% this week",
+      trendUp: true,
+      color: "#0066FF",
+    },
+    {
+      icon: BarChart3,
+      label: "Reports Generated",
+      value: stats?.reports_generated ?? "—",
+      trend: "Last 30 days",
+      trendUp: null,
+      color: "#00D4FF",
+    },
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Vehicle Insurance Risk Analytics Overview</p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div>
+          <h1 className="nu-page-title">
+            {greeting},{" "}
+            <span style={{ color: "#00D4FF" }}>
+              {user?.name || user?.email?.split("@")[0] || "Analyst"}
+            </span>
+          </h1>
+          <div
+            style={{
+              fontFamily: "'Roboto Mono', monospace",
+              fontSize: 12,
+              color: "#485068",
+              marginTop: 6,
+            }}
+          >
+            {new Date().toLocaleDateString("en-IN", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </div>
+        </div>
+        <button
+          className="nu-btn-ghost"
+          onClick={() => window.location.reload()}
+          style={{ display: "flex", alignItems: "center", gap: 8 }}
+        >
+          <RefreshCw size={13} />
+          Refresh
+        </button>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((card, i) => (
-          <motion.div
-            key={card.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-          >
-            <Card>
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className={`rounded-lg bg-muted p-2.5 ${card.color}`}>
-                  <card.icon className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">{card.label}</p>
-                  <p className="text-xl font-bold">{card.value}</p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+      {/* KPI Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+          gap: 16,
+        }}
+      >
+        {kpis.map((kpi, i) => (
+          <KpiCard key={kpi.label} {...kpi} delay={i * 40} />
         ))}
       </div>
-
-      {/* Risk Score Trend — Hero Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Risk Score Trend</CardTitle>
-          <p className="text-xs text-muted-foreground">Average portfolio risk score over time with threshold bands</p>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={320}>
-            <AreaChart data={riskTrendData}>
-              <defs>
-                <linearGradient id="riskGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(220,70%,55%)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(220,70%,55%)" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-              <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 11 }} />
-              <YAxis domain={[0, 100]} className="text-xs" tick={{ fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(220,25%,12%)",
-                  border: "1px solid hsl(220,20%,20%)",
-                  borderRadius: "8px",
-                  color: "#fff",
-                  fontSize: 12,
-                }}
-                labelStyle={{ color: "hsl(220,10%,70%)", fontWeight: 600 }}
-              />
-              {/* Threshold bands as reference areas */}
-              <Area type="monotone" dataKey="avgScore" stroke="hsl(220,70%,55%)" strokeWidth={2.5} fill="url(#riskGrad)" dot={{ r: 3, fill: "hsl(220,70%,55%)", strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 2, stroke: "#fff" }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Stacked Risk Band Area */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Risk Band Distribution Over Time</CardTitle>
-            <p className="text-xs text-muted-foreground">Stacked view of policy count by risk band</p>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={riskTrendData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 11 }} />
-                <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(220,25%,12%)",
-                    border: "1px solid hsl(220,20%,20%)",
-                    borderRadius: "8px",
-                    color: "#fff",
-                    fontSize: 12,
-                  }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Area type="monotone" dataKey="low" stackId="1" stroke={RISK_COLORS[0]} fill={RISK_COLORS[0]} fillOpacity={0.6} />
-                <Area type="monotone" dataKey="medium" stackId="1" stroke={RISK_COLORS[1]} fill={RISK_COLORS[1]} fillOpacity={0.6} />
-                <Area type="monotone" dataKey="high" stackId="1" stroke={RISK_COLORS[2]} fill={RISK_COLORS[2]} fillOpacity={0.6} />
-                <Area type="monotone" dataKey="critical" stackId="1" stroke={RISK_COLORS[3]} fill={RISK_COLORS[3]} fillOpacity={0.6} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Risk Distribution Donut */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Current Risk Split</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center">
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie data={riskData} cx="50%" cy="50%" innerRadius={55} outerRadius={95} dataKey="value" paddingAngle={3}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={{ strokeWidth: 1 }}>
-                  {riskData.map((_, i) => (
-                    <Cell key={i} fill={RISK_COLORS[i]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      
+      {/* Tab Navigation */}
+      <div style={{ display: "flex", gap: 24, borderBottom: "1px solid #1E2535", paddingBottom: 0 }}>
+        <button
+          onClick={() => setActiveTab("feed")}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            padding: "8px 0 12px", borderBottom: activeTab === "feed" ? "2px solid #00D4FF" : "2px solid transparent",
+            color: activeTab === "feed" ? "#00D4FF" : "#8A95B0",
+            fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 500,
+          }}
+        >
+          Live Inference Feed
+        </button>
+        <button
+          onClick={() => setActiveTab("renewal")}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            padding: "8px 0 12px", borderBottom: activeTab === "renewal" ? "2px solid #00D4FF" : "2px solid transparent",
+            color: activeTab === "renewal" ? "#00D4FF" : "#8A95B0",
+            fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 500,
+          }}
+        >
+          Renewal Intelligence
+        </button>
       </div>
 
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Policies & Claims */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Monthly Policies & Claims</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                <XAxis dataKey="month" className="text-xs" tick={{ fontSize: 11 }} />
-                <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(220,25%,12%)",
-                    border: "1px solid hsl(220,20%,20%)",
-                    borderRadius: "8px",
-                    color: "#fff",
-                    fontSize: 12,
+      {activeTab === "renewal" ? (
+        <RenewalTab />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 20 }}>
+        {/* Risk Trend Chart Placeholder */}
+        <div className="nu-card" style={{ padding: 24 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#F0F4FF",
+              }}
+            >
+              Risk Trend
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              {[
+                { label: "LOW", color: "#00E676" },
+                { label: "MEDIUM", color: "#FFB300" },
+                { label: "HIGH", color: "#FF6400" },
+                { label: "CRITICAL", color: "#FF3B5C" },
+              ].map((l) => (
+                <div
+                  key={l.label}
+                  style={{
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: 9,
+                    color: l.color,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
                   }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="policies" fill="hsl(220,70%,45%)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="claims" fill="hsl(0,72%,51%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+                >
+                  <div
+                    style={{
+                      width: 16,
+                      height: 2,
+                      backgroundColor: l.color,
+                      borderRadius: 1,
+                    }}
+                  />
+                  {l.label}
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Fake sparkline chart */}
+          <svg width="100%" height="140" style={{ display: "block" }}>
+            <defs>
+              <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#00D4FF" stopOpacity="0.15" />
+                <stop offset="100%" stopColor="#00D4FF" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {/* Grid lines */}
+            {[0, 35, 70, 105, 140].map((y) => (
+              <line key={y} x1="0" y1={y} x2="100%" y2={y} stroke="#1E2535" strokeWidth="1" />
+            ))}
+            {/* LOW line */}
+            <polyline
+              fill="none"
+              stroke="#00E676"
+              strokeWidth="1.5"
+              points="0,110 60,105 120,108 180,100 240,95 300,92 360,90 420,85 480,82 540,78 600,75 660,72"
+            />
+            {/* MEDIUM line */}
+            <polyline
+              fill="none"
+              stroke="#FFB300"
+              strokeWidth="1.5"
+              points="0,80 60,75 120,78 180,72 240,68 300,65 360,62 420,58 480,55 540,52 600,50 660,48"
+            />
+            {/* HIGH line */}
+            <polyline
+              fill="none"
+              stroke="#FF6400"
+              strokeWidth="1.5"
+              points="0,55 60,50 120,52 180,48 240,45 300,42 360,40 420,38 480,36 540,34 600,32 660,30"
+            />
+            {/* CRITICAL line */}
+            <polyline
+              fill="none"
+              stroke="#FF3B5C"
+              strokeWidth="1.5"
+              points="0,35 60,32 120,30 180,28 240,26 300,24 360,22 420,20 480,18 540,16 600,15 660,14"
+            />
+          </svg>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: 8,
+              fontFamily: "'Roboto Mono', monospace",
+              fontSize: 9,
+              color: "#485068",
+            }}
+          >
+            {["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"].map(
+              (m) => <span key={m}>{m}</span>
+            )}
+          </div>
+        </div>
 
-        {/* Premium Collected vs Recommended */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Premium: Collected vs Recommended</CardTitle>
-            <p className="text-xs text-muted-foreground">Gap analysis between actual and AI-recommended premiums</p>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={premiumTrendData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                <XAxis dataKey="month" className="text-xs" tick={{ fontSize: 11 }} />
-                <YAxis className="text-xs" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(220,25%,12%)",
-                    border: "1px solid hsl(220,20%,20%)",
-                    borderRadius: "8px",
-                    color: "#fff",
-                    fontSize: 12,
+        {/* Agent Runs Card */}
+        <div className="nu-card-ai" style={{ padding: 24 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 18,
+            }}
+          >
+            <Zap size={13} color="#00D4FF" />
+            <span
+              style={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#F0F4FF",
+              }}
+            >
+              Agent Runs
+            </span>
+            <span
+              style={{
+                marginLeft: "auto",
+                fontFamily: "'Roboto Mono', monospace",
+                fontSize: 9,
+                color: "#485068",
+              }}
+            >
+              llama-3.3-70b
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {AGENT_RUNS.map((run) => (
+              <div
+                key={run.id}
+                style={{
+                  borderBottom: "1px solid #1E2535",
+                  paddingBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 4,
                   }}
-                  formatter={(value: number) => [`₹${value.toLocaleString("en-IN")}`, undefined]}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="collected" stroke="hsl(220,70%,55%)" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="recommended" stroke="hsl(160,50%,45%)" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+                >
+                  <span
+                    style={{
+                      fontFamily: "'Roboto Mono', monospace",
+                      fontSize: 12,
+                      color: "#00D4FF",
+                    }}
+                  >
+                    {run.id}
+                  </span>
+                  <RiskBadge band={run.band} />
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 12,
+                    color: "#8A95B0",
+                    marginBottom: 4,
+                  }}
+                >
+                  {run.holder}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontFamily: "'Roboto Mono', monospace",
+                    fontSize: 9,
+                    color: "#485068",
+                  }}
+                >
+                  <span>{run.nodes}</span>
+                  <span>·</span>
+                  <span>{run.time}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Policies Table */}
+      <div className="nu-card" style={{ padding: 24 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#F0F4FF",
+            }}
+          >
+            Recent Policies
+          </div>
+          <Link
+            to="/policies"
+            style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 11,
+              color: "#00D4FF",
+              textDecoration: "none",
+            }}
+          >
+            View All →
+          </Link>
+        </div>
+
+        {loading ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="nu-shimmer"
+                style={{ height: 44, borderRadius: 6 }}
+              />
+            ))}
+          </div>
+        ) : policies.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px 0",
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 14,
+              color: "#485068",
+            }}
+          >
+            No policies yet.{" "}
+            <Link to="/policies" style={{ color: "#00D4FF", textDecoration: "none" }}>
+              Add your first policy →
+            </Link>
+          </div>
+        ) : (
+          <table className="nu-table">
+            <thead>
+              <tr>
+                <th>Policy No.</th>
+                <th>Holder Name</th>
+                <th>Vehicle</th>
+                <th>Risk Band</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {policies.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <span
+                      style={{
+                        fontFamily: "'Roboto Mono', monospace",
+                        fontSize: 12,
+                        color: "#00D4FF",
+                      }}
+                    >
+                      {p.policy_number || `IQ-${String(p.id).slice(-5)}`}
+                    </span>
+                  </td>
+                  <td style={{ color: "#F0F4FF", fontSize: 13 }}>{p.holder_name || "—"}</td>
+                  <td style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, color: "#8A95B0" }}>
+                    {p.vehicle_make || "—"} {p.vehicle_model || ""}
+                  </td>
+                  <td>
+                    <RiskBadge
+                      band={p.risk_band || p.current_risk_band || "LOW"}
+                    />
+                  </td>
+                  <td>
+                    <Link
+                      to={`/policies/${p.id}`}
+                      style={{
+                        fontFamily: "'IBM Plex Mono', monospace",
+                        fontSize: 11,
+                        color: "#0066FF",
+                        textDecoration: "none",
+                      }}
+                    >
+                      View →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

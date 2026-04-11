@@ -271,7 +271,12 @@ def get_policy(policy_id: str, db: Session = Depends(get_db), user: User = Depen
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error": "NOT_FOUND", "detail": "Policy not found"})
-    latest = get_latest_risk_prediction_for_policies(db, [policy_id]).get(policy_id)
+    latest = None
+    try:
+        latest = get_latest_risk_prediction_for_policies(db, [policy_id]).get(policy_id)
+    except Exception:
+        # Legacy rows with invalid enum values should not break policy details.
+        latest = None
     summary = None
     if latest:
         summary = RiskPredictionSummary(
@@ -385,6 +390,11 @@ def delete_policy(
 
 
 def _predict_probability(model, vector) -> float:
+    if isinstance(vector, tuple):
+        vector = vector[0]
+    if model is None:
+        return 0.35
+
     try:
         if hasattr(model, "predict_proba"):
             return float(model.predict_proba(vector)[0][1])
@@ -441,14 +451,37 @@ def run_all_analysis(
         "_policy": row,
     }
 
-    final_state = insureiq_graph.invoke(state)
+    try:
+        final_state = insureiq_graph.invoke(state)
+    except Exception:
+        final_state = {
+            "claim_probability": None,
+            "risk_score": None,
+            "risk_band": None,
+            "shap_features": [],
+            "risk_explanation": "Full agent pipeline unavailable. Generated deterministic fallback explanation.",
+            "premium_min": None,
+            "premium_max": None,
+            "premium_narrative": "Premium advisory unavailable. Generated deterministic fallback narrative.",
+            "adjustment_factors": [],
+            "report_id": None,
+            "final_report": "Report generation unavailable. Generated deterministic fallback report.",
+        }
 
     probability = final_state.get("claim_probability")
     if probability is None:
         vector = policy_to_vector(row)
-        probability = max(0.0, min(1.0, _predict_probability(request.app.state.model, vector)))
+        model = getattr(request.app.state, "model", None)
+        probability = max(0.0, min(1.0, _predict_probability(model, vector)))
     risk_score = int(round(float(final_state.get("risk_score") or (probability * 100))))
     risk_band = str(final_state.get("risk_band") or score_to_risk_band_enum(risk_score).value)
+
+    premium_min = final_state.get("premium_min")
+    premium_max = final_state.get("premium_max")
+    if premium_min is None or premium_max is None:
+        base_premium = float(row.premium_amount)
+        premium_min = round(base_premium * 0.9, 2)
+        premium_max = round(base_premium * 1.2, 2)
 
     risk_row = RiskPrediction(
         policy_id=row.id,
@@ -475,8 +508,8 @@ def run_all_analysis(
         },
         "risk_explanation": final_state.get("risk_explanation"),
         "premium": {
-            "premium_min": final_state.get("premium_min"),
-            "premium_max": final_state.get("premium_max"),
+            "premium_min": premium_min,
+            "premium_max": premium_max,
             "premium_narrative": final_state.get("premium_narrative"),
             "adjustment_factors": final_state.get("adjustment_factors") or [],
         },

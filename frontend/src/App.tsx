@@ -19,6 +19,9 @@ import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
+import Analytics from "./pages/Analytics";
+import Workbench from "./pages/Workbench";
+import FraudReview from "./pages/FraudReview";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +52,9 @@ const App = () => (
                     <Route path="/premium-advisory" element={<PremiumAdvisory />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/batch-analysis" element={<BatchAnalysis />} />
+                    <Route path="/analytics" element={<Analytics />} />
+                    <Route path="/workbench" element={<Workbench />} />
+                    <Route path="/fraud-review" element={<FraudReview />} />
                     <Route path="/audit-log" element={<AuditLog />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<NotFound />} />

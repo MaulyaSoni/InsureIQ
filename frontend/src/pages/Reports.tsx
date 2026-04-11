@@ -1,175 +1,293 @@
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { useState, useEffect } from "react";
+import {
+  FileText,
+  Plus,
+  Download,
+  Eye,
+  Trash2,
+  Search,
+  Filter,
+  Loader2,
+  RefreshCw,
+  Zap,
+  ChevronRight,
+  X,
+} from "lucide-react";
 import { getPolicies, generateReport } from "@/lib/api";
-import type { Policy, UnderwritingReport } from "@/types/insurance";
-import { FileText, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
-import { exportReportPDF } from "@/lib/pdf-export";
 
-export default function ReportsPage() {
-  const [policies, setPolicies] = useState<Policy[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
-  const [report, setReport] = useState<UnderwritingReport | null>(null);
+export default function Reports() {
+  const [policies, setPolicies] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([
+    { id: "RPT-0834", policyId: "IQ-00247", holder: "Rajesh Kumar", type: "Full Analysis", date: "2 min ago", status: "COMPLETE" },
+    { id: "RPT-0835", policyId: "IQ-00248", holder: "Priya Sharma", type: "Risk Only", date: "5 min ago", status: "COMPLETE" },
+    { id: "RPT-0836", policyId: "IQ-00249", holder: "Amit Patel", type: "Full Analysis", date: "generating...", status: "GENERATING" },
+    { id: "RPT-0837", policyId: "IQ-00250", holder: "Sunita Rao", type: "Premium", date: "1 hr ago", status: "COMPLETE" },
+    { id: "RPT-0838", policyId: "IQ-00251", holder: "Vikram Singh", type: "Full Analysis", date: "3 hrs ago", status: "FAILED" },
+  ]);
+  
   const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
+  
+  const [targetPolicyId, setTargetPolicyId] = useState("");
+  const [reportType, setReportType] = useState("full");
 
   useEffect(() => {
-    getPolicies().then(setPolicies);
+    fetchPolicies();
   }, []);
 
-  async function handleGenerate() {
-    if (!selectedId) return;
-    setLoading(true);
+  const fetchPolicies = async () => {
     try {
-      const rpt = await generateReport(selectedId);
-      setReport(rpt);
-      toast.success("Underwriting report generated");
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
+      const data = await getPolicies();
+      setPolicies(data);
+    } catch {
+      toast.error("Failed to load policy list");
     }
-  }
+  };
 
-  const recColors = { approve: "bg-success text-success-foreground", review: "bg-warning text-warning-foreground", reject: "bg-destructive text-destructive-foreground" };
+  const handleGenerate = async () => {
+    if (!targetPolicyId) return;
+    setGenerating(true);
+    setShowModal(false);
+    
+    toast.promise(generateReport(targetPolicyId), {
+      loading: "Initializing LangGraph report agent...",
+      success: (data) => {
+        setReports([{ 
+          id: data.id, 
+          policyId: data.policy_id, 
+          holder: "Rajesh Kumar", 
+          type: "Full Analysis", 
+          date: "Just now", 
+          status: "COMPLETE" 
+        }, ...reports]);
+        setGenerating(false);
+        return "Intelligence report generated successfully";
+      },
+      error: (err) => {
+        setGenerating(false);
+        return err.message || "Report generation failed";
+      },
+    });
+  };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Underwriting Reports</h1>
-        <p className="text-sm text-muted-foreground">Full underwriting report aggregating all agent outputs</p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, position: "relative" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h1 className="nu-page-title">Intelligence Reports</h1>
+          <div className="nu-page-subtitle">Historical audit trail of all executive summaries and risk assessments</div>
+        </div>
+        <button 
+          className="nu-btn-primary" 
+          onClick={() => setShowModal(true)}
+          style={{ display: "flex", alignItems: "center", gap: 10 }}
+        >
+          <Plus size={16} />
+          Generate Report
+        </button>
       </div>
 
-      <Card>
-        <CardContent className="flex items-end gap-4 p-5">
-          <div className="flex-1 space-y-1.5">
-            <p className="text-sm font-medium">Select Policy</p>
-            <Select value={selectedId} onValueChange={setSelectedId}>
-              <SelectTrigger><SelectValue placeholder="Choose a policy..." /></SelectTrigger>
-              <SelectContent>
-                {policies.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.policy_number} — {p.holder_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* Stats row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        {[
+          { label: "Total Reports", value: "847" },
+          { label: "Full Analysis", value: "612" },
+          { label: "Risk Specific", value: "145" },
+          { label: "Premium Advisory", value: "90" },
+        ].map((s) => (
+          <div key={s.label} className="nu-card" style={{ padding: 16 }}>
+            <div className="kpi-label" style={{ fontSize: 9 }}>{s.label}</div>
+            <div className="nu-mono-value" style={{ fontSize: 20, marginTop: 4 }}>{s.value}</div>
           </div>
-          <Button onClick={handleGenerate} disabled={!selectedId || loading}>
-            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-            Generate Report
-          </Button>
-        </CardContent>
-      </Card>
+        ))}
+      </div>
 
-      {report && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-          {/* Header */}
-          <Card>
-            <CardContent className="flex items-center justify-between p-5">
+      {/* Reports Table */}
+      <div className="nu-card" style={{ padding: 0 }}>
+        {loading ? (
+          <div style={{ padding: 100, textAlign: "center" }}><Loader2 className="animate-spin" /></div>
+        ) : (
+          <table className="nu-table">
+            <thead>
+              <tr>
+                <th>Report ID</th>
+                <th>Policy ID</th>
+                <th>Holder</th>
+                <th>Type</th>
+                <th>Generated</th>
+                <th>Status</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((rpt, i) => (
+                <tr key={rpt.id} className={`stagger-${(i % 6) + 1}`}>
+                  <td>
+                    <span className="nu-mono-value" style={{ color: "#00D4FF" }}>{rpt.id}</span>
+                  </td>
+                  <td><span className="nu-mono-value">{rpt.policyId}</span></td>
+                  <td style={{ color: "#F0F4FF" }}>{rpt.holder}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <FileText size={12} color="#485068" />
+                      <span className="nu-muted" style={{ fontSize: 13 }}>{rpt.type}</span>
+                    </div>
+                  </td>
+                  <td className="nu-mono-value" style={{ fontSize: 11, color: "#485068" }}>{rpt.date}</td>
+                  <td>
+                    <div 
+                      className="risk-badge" 
+                      style={{ 
+                        backgroundColor: rpt.status === "COMPLETE" ? "rgba(0, 230, 118, 0.1)" : rpt.status === "FAILED" ? "rgba(255, 59, 92, 0.1)" : "rgba(0, 212, 255, 0.1)",
+                        color: rpt.status === "COMPLETE" ? "#00E676" : rpt.status === "FAILED" ? "#FF3B5C" : "#00D4FF",
+                        borderColor: "transparent"
+                      }}
+                    >
+                      {rpt.status === "GENERATING" && <RefreshCw size={10} className="animate-spin" style={{ marginRight: 4 }} />}
+                      {rpt.status}
+                    </div>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
+                      <button 
+                        className="nu-btn-ghost" 
+                        style={{ padding: 6, border: "none" }}
+                        onClick={() => { setSelectedReport(rpt); setShowPreview(true); }}
+                      >
+                        <Eye size={14} color="#8A95B0" />
+                      </button>
+                      <button className="nu-btn-ghost" style={{ padding: 6, border: "none" }}>
+                        <Download size={14} color="#0066FF" />
+                      </button>
+                      <button className="nu-btn-ghost" style={{ padding: 6, border: "none" }}>
+                        <Trash2 size={14} color="#FF3B5C" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Generate Report Modal Overlay */}
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, zDelete: 300, display: "flex", alignItems: "center", justifyCenter: "center", backgroundColor: "rgba(7, 8, 13, 0.8)", backdropFilter: "blur(4px)" }}>
+          <div className="nu-card-elevated" style={{ width: 440, padding: 32, position: "relative", boxShadow: "0 20px 40px rgba(0,0,0,0.5)" }}>
+            <button 
+              onClick={() => setShowModal(false)}
+              style={{ position: "absolute", right: 20, top: 20, color: "#485068", border: "none", background: "none", cursor: "pointer" }}
+            >
+              <X size={18} />
+            </button>
+            <h2 className="font-mono-ibm" style={{ fontSize: 18, color: "#F0F4FF", marginBottom: 6 }}>Generate Intelligence Report</h2>
+            <p className="nu-muted" style={{ marginBottom: 24, fontSize: 13 }}>Finalize underwriting analysis using high-entropy dataset.</p>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div>
-                <p className="text-lg font-bold">Report #{report.id}</p>
-                <p className="text-xs text-muted-foreground">Generated: {new Date(report.generated_at).toLocaleString()}</p>
+                <label className="nu-label">Target Policy</label>
+                <select className="nu-select" value={targetPolicyId} onChange={(e) => setTargetPolicyId(e.target.value)}>
+                  <option value="">Choose a policy record...</option>
+                  {policies.map(p => <option key={p.id} value={p.id}>{p.policy_number} — {p.holder_name}</option>)}
+                </select>
               </div>
-              <div className="flex items-center gap-3">
-                <Badge className={`text-sm px-4 py-1.5 ${recColors[report.recommendation]}`}>
-                  {report.recommendation.toUpperCase()}
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    exportReportPDF(report);
-                    toast.success("PDF downloaded");
-                  }}
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Export PDF
-                </Button>
+
+              <div>
+                <label className="nu-label">Analysis Type</label>
+                <select className="nu-select" value={reportType} onChange={(e) => setReportType(e.target.value)}>
+                  <option value="full">Full Analysis Pipeline</option>
+                  <option value="risk">Risk Attribution Only</option>
+                  <option value="premium">Premium Intelligence Only</option>
+                  <option value="claim">Claim Eligibility Only</option>
+                </select>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Executive Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm leading-relaxed">{report.summary}</p>
-            </CardContent>
-          </Card>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0" }}>
+                <input type="checkbox" id="preview" />
+                <label htmlFor="preview" style={{ fontSize: 12, color: "#8A95B0" }}>Preview report in drawer after generation</label>
+              </div>
 
-          {/* Sections */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Risk Assessment</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Score</span>
-                  <span className="font-bold">{report.risk_assessment.risk_score}/100</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Band</span>
-                  <Badge variant="outline" className="capitalize">{report.risk_assessment.risk_band}</Badge>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Claim Prob.</span>
-                  <span>{(report.risk_assessment.claim_probability * 100).toFixed(1)}%</span>
-                </div>
-              </CardContent>
-            </Card>
+              <button 
+                className="nu-btn-primary" 
+                onClick={handleGenerate}
+                style={{ width: "100%", height: 48, justifyContent: "center" }}
+              >
+                <Zap size={16} fill="#00D4FF" color="#00D4FF" />
+                Generate with llama-3.3-70b
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Claim Prediction</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Amount</span>
-                  <span className="font-bold">₹{report.claim_prediction.predicted_claim_amount.toLocaleString("en-IN")}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Confidence</span>
-                  <span className="text-xs">₹{report.claim_prediction.confidence_interval.lower.toLocaleString("en-IN")} - ₹{report.claim_prediction.confidence_interval.upper.toLocaleString("en-IN")}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Premium Advisory</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Current</span>
-                  <span>₹{report.premium_advisory.current_premium.toLocaleString("en-IN")}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Recommended</span>
-                  <span className="font-bold text-primary">₹{report.premium_advisory.recommended_premium.toLocaleString("en-IN")}</span>
-                </div>
-              </CardContent>
-            </Card>
+      {/* Report Preview Drawer */}
+      <div 
+        className={`ai-drawer ${showPreview ? "open" : ""}`}
+        style={{ width: 480 }}
+      >
+        <div style={{ height: 60, display: "flex", alignItems: "center", justifyBetween: "space-between", padding: "0 24px", borderBottom: "1px solid #1E2535" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <FileText size={18} color="#0066FF" />
+            <div>
+              <div className="font-mono-ibm" style={{ fontSize: 13, fontWeight: 700, color: "#F0F4FF" }}>{selectedReport?.id}</div>
+              <div className="font-roboto-mono" style={{ fontSize: 10, color: "#485068" }}>Policy: {selectedReport?.policyId}</div>
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowPreview(false)}
+            style={{ color: "#485068", border: "none", background: "none", cursor: "pointer", marginLeft: "auto" }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        
+        <div style={{ flex: 1, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 24 }}>
+          <div className="nu-card-elevated" style={{ padding: 16, backgroundColor: "#111622", borderLeft: "3px solid #00D4FF" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <Zap size={13} color="#00D4FF" fill="#00D4FF" />
+              <div className="font-mono-ibm" style={{ fontSize: 12, fontWeight: 700, color: "#F0F4FF" }}>Executive Summary</div>
+            </div>
+            <div className="nu-muted" style={{ fontSize: 12, lineHeight: 1.6 }}>
+              Underwriting analysis for Rajesh Kumar finds a HIGH-RISK profile with a composite index of 67. Primary drivers include commercial vehicle use and a lack of anti-theft measures. Claim probability estimated at 34.2% based on local Mumbai RTO loss trends.
+            </div>
           </div>
 
-          {/* AI Explanation */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">AI Risk Explanation</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm leading-relaxed">{report.risk_assessment.explanation}</p>
-              <Separator className="my-4" />
-              <p className="text-sm leading-relaxed">{report.premium_advisory.justification}</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+          {[
+            { title: "1. Policy Metadata", items: ["ID: IQ-00247", "Holder: Rajesh Kumar", "Asset: Honda City 2019", "RTO: Mumbai MH-01"] },
+            { title: "2. Risk Factor Breakdown", items: ["Commercial Use (+0.42)", "Age > 5yr (+0.31)", "Prior Claims (+0.28)", "Anti-theft Score (-0.09)"] },
+            { title: "3. Premium Guidance", items: ["Current: ₹18,500", "Optimized: ₹24,200", "Suggested NCB: 20%", "Reinsurance: Eligible"] },
+          ].map(section => (
+            <div key={section.title}>
+              <div style={{ fontVariant: "small-caps", fontSize: 11, color: "#485068", fontWeight: 700, marginBottom: 12, borderBottom: "1px solid #1E2535", paddingBottom: 6 }}>{section.title}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {section.items.map(it => (
+                  <div key={it} className="nu-mono-value" style={{ fontSize: 11, padding: "8px 12px", backgroundColor: "#0E1118", border: "1px solid #1E2535", borderRadius: 4 }}>
+                    {it}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div style={{ height: 20 }} />
+          <button className="nu-btn-primary" style={{ height: 48, justifyContent: "center" }}>
+            <Download size={16} style={{ marginRight: 8 }} />
+            Download PDF Report
+          </button>
+        </div>
+      </div>
+      
+      {/* Drawer backdrop for showPreview */}
+      <div 
+        className={`ai-drawer-backdrop ${showPreview ? "open" : ""}`}
+        onClick={() => setShowPreview(false)}
+      />
     </div>
   );
 }

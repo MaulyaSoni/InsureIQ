@@ -32,6 +32,11 @@ Return ONLY valid JSON. Example: {{"incident_type": "accident", "date_of_inciden
 
 
 def _predict_probability(model, vector) -> float:
+    if isinstance(vector, tuple):
+        vector = vector[0]
+    if model is None:
+        return 0.35
+
     try:
         if hasattr(model, "predict_proba"):
             return float(model.predict_proba(vector)[0][1])
@@ -67,8 +72,9 @@ def predict_claim(
         raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "detail": "Policy not found"})
 
     data = policy_orm_to_dict(policy)
-    vector = policy_to_feature_vector(data)
-    prob = max(0.0, min(1.0, _predict_probability(request.app.state.model, vector)))
+    vector, _ = policy_to_feature_vector(data)
+    model = getattr(request.app.state, "model", None)
+    prob = max(0.0, min(1.0, _predict_probability(model, vector)))
     score = probability_to_risk_score(prob)
     band = risk_score_to_band(score)
 

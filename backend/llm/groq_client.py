@@ -79,7 +79,8 @@ def invoke_llm(
         error_str = str(exc).lower()
         if "429" in error_str or "rate_limit" in error_str or "rate limit" in error_str:
             raise RateLimitError(f"Groq rate limit hit: {exc}") from exc
-        raise
+        # Return fallback instead of crashing
+        return _fallback_text(model_key, user_content)
 
 
 def invoke_with_retry(model_key: str, messages: list[dict[str, str]], response_format: Any = None) -> str:

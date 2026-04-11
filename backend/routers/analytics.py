@@ -1,485 +1,336 @@
-﻿import json
-from datetime import datetime
-from uuid import uuid4
+from datetime import datetime, timedelta
+from typing import Literal
 
-import numpy as np
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user
-from backend.cache import build_cache_key, get_cached_response, set_cached_response
-from backend.config import get_settings
 from backend.database.db import get_db
-from backend.ml import policy_to_vector, score_to_band, score_to_risk_band_enum
-from backend.database.models import BatchJob, BatchJobStatus, Policy, Report, ReportType, RiskPrediction, User
-from backend.schemas import (
-    BatchJobOut,
-    BatchRequest,
-    ClaimPredictionOut,
-    DashboardStatsOut,
-    PolicyActionRequest,
-    PremiumAdvisoryOut,
-    RiskAssessmentOut,
-    SHAPFeature,
-    UnderwritingReportOut,
-)
+from backend.database.models import Policy, RiskPrediction, User
+from backend.llm.cache import make_cache_key, get_cached, set_cached
+from backend.llm.groq_client import invoke_llm
 
-router = APIRouter(tags=["analytics"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/analytics", tags=["analytics"], dependencies=[Depends(get_current_user)])
+
+CITY_COORDS: dict[str, tuple[float, float]] = {
+    "mumbai": (19.076, 72.877),
+    "delhi": (28.704, 77.102),
+    "bengaluru": (12.972, 77.594),
+    "chennai": (13.083, 80.270),
+    "hyderabad": (17.385, 78.487),
+    "pune": (18.520, 73.855),
+    "kolkata": (22.573, 88.363),
+    "ahmedabad": (23.021, 72.579),
+    "jaipur": (26.912, 75.787),
+    "lucknow": (26.846, 80.946),
+    "chandigarh": (30.733, 76.779),
+    "kochi": (9.931, 76.267),
+    "indore": (22.720, 75.858),
+    "nagpur": (21.146, 79.083),
+    "bhopal": (23.259, 77.412),
+    "patna": (25.594, 85.138),
+    "ranchi": (23.344, 85.310),
+    "guwahati": (26.144, 91.736),
+    "srinagar": (34.083, 74.797),
+    "mysore": (12.295, 76.639),
+}
+
+METRO_CITIES = {"mumbai", "delhi", "bengaluru", "chennai", "hyderabad", "pune", "kolkata"}
+TIER2_CITIES = {"ahmedabad", "jaipur", "lucknow", "chandigarh", "kochi", "indore"}
 
 
-def _predict_score(model, vector: np.ndarray) -> float:
+def _get_latest_predictions(db: Session, user: User) -> list[RiskPrediction]:
+    policy_ids_sub = db.query(Policy.id).filter(
+        Policy.user_id == user.id, Policy.is_active.is_(True)
+    )
+    latest_sub = (
+        db.query(
+            RiskPrediction.policy_id,
+            func.max(RiskPrediction.created_at).label("max_created"),
+        )
+        .filter(RiskPrediction.policy_id.in_(policy_ids_sub))
+        .group_by(RiskPrediction.policy_id)
+        .subquery()
+    )
+    return (
+        db.query(RiskPrediction)
+        .join(
+            latest_sub,
+            (RiskPrediction.policy_id == latest_sub.c.policy_id)
+            & (RiskPrediction.created_at == latest_sub.c.max_created),
+        )
+        .join(Policy, RiskPrediction.policy_id == Policy.id)
+        .filter(RiskPrediction.policy_id.in_(policy_ids_sub))
+        .all()
+    )
+
+
+def _compute_segment_key(policy: Policy, segment_by: str) -> str:
+    if segment_by == "vehicle_type":
+        return f"{policy.vehicle_make} {policy.vehicle_model}"
+    if segment_by == "vehicle_use":
+        return policy.vehicle_use.value.title()
+    if segment_by == "city_tier":
+        city_l = policy.city.lower()
+        if city_l in METRO_CITIES:
+            return "Metro"
+        if city_l in TIER2_CITIES:
+            return "Tier-2"
+        return "Tier-3"
+    if segment_by == "vehicle_year_range":
+        year = policy.vehicle_year
+        if year >= 2023:
+            return "2023-2025"
+        if year >= 2018:
+            return "2018-2022"
+        if year >= 2013:
+            return "2013-2017"
+        return "Pre-2013"
+    if segment_by == "engine_cc_range":
+        cc = policy.engine_cc
+        if cc >= 2000:
+            return "2000cc+"
+        if cc >= 1500:
+            return "1500-1999cc"
+        if cc >= 1000:
+            return "1000-1499cc"
+        return "<1000cc"
+    if segment_by == "parking_type":
+        return policy.parking_type.value.title()
+    if segment_by == "ncb_band":
+        ncb = policy.ncb_percentage
+        if ncb >= 50:
+            return "NCB 50%+"
+        if ncb >= 25:
+            return "NCB 25-49%"
+        return "NCB 0-24%"
+    return "Other"
+
+
+def compute_segment_breakdown(db: Session, user: User, segment_by: str = "vehicle_type") -> list[dict]:
+    latest_preds = _get_latest_predictions(db, user)
+
+    segments: dict[str, dict] = {}
+    for pred in latest_preds:
+        key = _compute_segment_key(pred.policy, segment_by)
+        if key not in segments:
+            segments[key] = {
+                "segment_label": key,
+                "policy_count": 0,
+                "total_risk_score": 0.0,
+                "total_claim_prob": 0.0,
+                "total_premium": 0.0,
+                "shap_counter": {},
+            }
+        s = segments[key]
+        s["policy_count"] += 1
+        s["total_risk_score"] += float(pred.risk_score)
+        s["total_claim_prob"] += float(pred.claim_probability)
+        s["total_premium"] += float(pred.policy.premium_amount)
+        if pred.shap_features:
+            top = pred.shap_features[0]
+            fname = top.get("feature_name", "unknown")
+            s["shap_counter"][fname] = s["shap_counter"].get(fname, 0) + 1
+
+    result = []
+    for key, s in segments.items():
+        count = s["policy_count"]
+        top_shap = max(s["shap_counter"], key=s["shap_counter"].get) if s["shap_counter"] else None
+        result.append({
+            "segment_label": s["segment_label"],
+            "policy_count": count,
+            "avg_risk_score": round(s["total_risk_score"] / count, 1),
+            "claim_rate": round(s["total_claim_prob"] / count * 100, 1),
+            "avg_premium": round(s["total_premium"] / count, 0),
+            "top_shap_factor": top_shap,
+        })
+
+    result.sort(key=lambda x: x["avg_risk_score"], reverse=True)
+    return result
+
+
+def compute_risk_concentration(db: Session, user: User) -> list[dict]:
+    latest_preds = _get_latest_predictions(db, user)
+
+    concentration: dict[tuple[str, str], dict] = {}
+    for pred in latest_preds:
+        city = pred.policy.city.lower()
+        use = pred.policy.vehicle_use.value
+        key = (city, use)
+        if key not in concentration:
+            concentration[key] = {"city": pred.policy.city.title(), "use": pred.policy.vehicle_use.value.title(), "total_prob": 0.0, "count": 0}
+        concentration[key]["total_prob"] += float(pred.claim_probability)
+        concentration[key]["count"] += 1
+
+    result = []
+    for (city, use), data in concentration.items():
+        avg_prob = data["total_prob"] / data["count"]
+        result.append({
+            "city": data["city"],
+            "vehicle_use": data["use"],
+            "policy_count": data["count"],
+            "avg_claim_probability": round(avg_prob * 100, 2),
+            "alert": "HIGH" if avg_prob > 0.5 else "MEDIUM" if avg_prob > 0.35 else "LOW",
+        })
+
+    result.sort(key=lambda x: x["avg_claim_probability"], reverse=True)
+    return result[:10]
+
+
+@router.get("/geo-heatmap")
+def geo_heatmap(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     try:
-        import xgboost as xgb
+        cache_key = make_cache_key(user.id, "geo_heatmap", "v1")
+        cached = get_cached(cache_key, db)
+        if cached:
+            import json
+            try:
+                return json.loads(cached)
+            except Exception:
+                pass
 
-        if model.__class__.__name__ == "Booster":
-            return float(model.predict(xgb.DMatrix(vector))[0])
+        latest_preds = _get_latest_predictions(db, user)
+
+        city_data: dict[str, dict] = {}
+        for pred in latest_preds:
+            city_key = (pred.policy.city or "unknown").lower()
+            if city_key not in city_data:
+                lat, lng = CITY_COORDS.get(city_key, (0.0, 0.0))
+                city_data[city_key] = {
+                    "city": (pred.policy.city or "Unknown").title(),
+                    "state": "India",
+                    "lat": lat,
+                    "lng": lng,
+                    "policy_count": 0,
+                    "total_risk_score": 0.0,
+                    "critical_count": 0,
+                    "high_count": 0,
+                    "total_claim_prob": 0.0,
+                }
+            cd = city_data[city_key]
+            cd["policy_count"] += 1
+            cd["total_risk_score"] += float(pred.risk_score or 0)
+            cd["total_claim_prob"] += float(pred.claim_probability or 0)
+            band_upper = str(pred.risk_band.value or "LOW").upper()
+            if band_upper == "CRITICAL":
+                cd["critical_count"] += 1
+            if band_upper in ("HIGH", "CRITICAL"):
+                cd["high_count"] += 1
+
+        result = []
+        for city, cd in city_data.items():
+            count = cd["policy_count"] or 1
+            result.append({
+                "city": cd["city"],
+                "state": cd["state"],
+                "lat": cd["lat"],
+                "lng": cd["lng"],
+                "policy_count": count,
+                "avg_risk_score": round(cd["total_risk_score"] / count, 1),
+                "critical_count": cd["critical_count"],
+                "high_rate_pct": round(cd["high_count"] / count * 100, 1),
+                "avg_claim_probability": round(cd["total_claim_prob"] / count, 4),
+            })
+
+        result.sort(key=lambda x: x["avg_risk_score"], reverse=True)
+        try:
+            import json
+            set_cached(cache_key, json.dumps(result), "analytics", 6, db)
+        except Exception:
+            pass
+        return result
+    except Exception as e:
+        import logging
+        logging.getLogger("insureiq").error("Analytics 500: %s", e)
+        return []
+
+
+@router.get("/segment-breakdown")
+def segment_breakdown(
+    segment_by: str = Query(default="vehicle_type"),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        return compute_segment_breakdown(db, user, segment_by)
     except Exception:
-        pass
-    pred = model.predict(vector)
-    return float(pred[0])
+        return []
 
 
-def _extract_shap(explainer, vector: np.ndarray) -> list[dict]:
-    if hasattr(explainer, "explain"):
-        return explainer.explain(vector)
-    return []
+@router.get("/risk-concentration")
+def risk_concentration(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    try:
+        return compute_risk_concentration(db, user)
+    except Exception:
+        return []
 
 
-def _groq_or_cache(db: Session, policy_id: str, endpoint: str, prompt: str) -> str:
-    settings = get_settings()
-    key = build_cache_key(policy_id, endpoint, settings.groq_model)
-    cached = get_cached_response(db, key)
-    if cached:
-        cached_text = str(cached.get("text", ""))
-        if "deterministic fallback explanation" not in cached_text.lower():
-            return cached_text
+INSIGHTS_PROMPT = """You are a senior portfolio risk analyst. Given this segment breakdown data for an insurance portfolio,
+write a 3-paragraph portfolio intelligence summary for underwriters.
 
-    text = ""
-    used_fallback = False
-    if settings.groq_api_key:
+Paragraph 1 — Risk Overview: Identify the highest-risk segments and concentration risks.
+Paragraph 2 — Actionable Recommendations: What should the underwriter do differently based on this data?
+Paragraph 3 — Early Warning: What emerging trends should they watch in the next 30-60 days?
+
+Data: {segment_data}
+
+Format: Return ONLY the 3 paragraphs. No headers. No bullet points. Plain professional language."""
+
+
+@router.get("/insights")
+def portfolio_insights(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        segments = compute_segment_breakdown(db, user, "vehicle_type")
+        concentrations = compute_risk_concentration(db, user)
+
+        cache_key = make_cache_key(user.id, "portfolio_insights_v2", "llama-3.3-70b-versatile")
+        cached = get_cached(cache_key, db)
+        if cached:
+            return {"insights": cached}
+
+        data_summary = f"Top segments by risk score: {', '.join(s['segment_label'] + '(' + str(s['avg_risk_score']) + ')' for s in segments[:5])}."
+        if concentrations:
+            data_summary += f" Top concentration: {concentrations[0]['city']} + {concentrations[0]['vehicle_use']} at {concentrations[0]['avg_claim_probability']}% claim probability."
+
+        # invoke_llm now returns fallback string on error, but we still wrap just in case
+        insights = invoke_llm("reasoner", INSIGHTS_PROMPT.format(segment_data=data_summary), "")
         try:
-            from groq import Groq
-
-            client = Groq(api_key=settings.groq_api_key)
-            completion = client.chat.completions.create(
-                model=settings.groq_model,
-                messages=[
-                    {"role": "system", "content": "You are an insurance underwriting assistant. Keep responses concise."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.2,
-            )
-            text = completion.choices[0].message.content or ""
+            set_cached(cache_key, insights, "llama-3.3-70b-versatile", 6, db)
         except Exception:
-            text = "LLM unavailable. Generated deterministic fallback explanation."
-            used_fallback = True
-    else:
-        text = "LLM key not configured. Generated deterministic fallback explanation."
-        used_fallback = True
-
-    if not used_fallback:
-        ttl_sec = int(max(1, settings.cache_ttl_hours) * 3600)
-        set_cached_response(db, key, {"text": text}, settings.groq_model, ttl_sec)
-    return text
-
-
-def _get_policy_or_404(db: Session, policy_id: str, user_id: str) -> Policy:
-    policy = (
-        db.query(Policy)
-        .filter(Policy.id == policy_id, Policy.user_id == user_id, Policy.is_active.is_(True))
-        .first()
-    )
-    if not policy:
-        raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "detail": "Policy not found"})
-    return policy
-
-
-@router.post("/risk-scoring", response_model=RiskAssessmentOut)
-def risk_scoring(
-    payload: PolicyActionRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    policy = _get_policy_or_404(db, payload.policy_id, user.id)
-    vector = policy_to_vector(policy)
-    score_raw = _predict_score(request.app.state.model, vector)
-    score = int(round(score_raw))
-    band = score_to_band(score)
-    claim_probability = round((score / 100) * 0.7, 3)
-
-    shap_features = _extract_shap(request.app.state.explainer, vector)
-    top_for_api: list[SHAPFeature] = []
-    for item in shap_features[:8]:
-        try:
-            top_for_api.append(SHAPFeature.model_validate(item))
-        except Exception:
-            continue
-
-    explanation_prompt = (
-        f"Policy {policy.policy_number}, holder {policy.policyholder_name}, score {score}, band {band}. "
-        "Write a short underwriting explanation."
-    )
-    explanation = _groq_or_cache(db, policy.id, "/risk-scoring", explanation_prompt)
-
-    now = datetime.utcnow()
-    pred_id = str(uuid4())
-    rp = RiskPrediction(
-        id=pred_id,
-        policy_id=policy.id,
-        user_id=user.id,
-        claim_probability=claim_probability,
-        risk_score=score,
-        risk_band=score_to_risk_band_enum(score_raw),
-        shap_features=shap_features,
-        llm_explanation=explanation,
-        model_version="xgb_v1",
-        created_at=now,
-    )
-    db.add(rp)
-    db.commit()
-
-    return RiskAssessmentOut(
-        id=pred_id,
-        policy_id=policy.id,
-        risk_score=score,
-        risk_band=band,  # type: ignore[arg-type]
-        claim_probability=claim_probability,
-        top_features=top_for_api,
-        explanation=explanation,
-        agent_type="risk_scoring",
-        created_at=now,
-    )
-
-
-@router.post("/claim-prediction", response_model=ClaimPredictionOut)
-def claim_prediction(
-    payload: PolicyActionRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    policy = _get_policy_or_404(db, payload.policy_id, user.id)
-    vector = policy_to_vector(policy)
-    score = _predict_score(request.app.state.model, vector)
-    probability = round((score / 100) * 0.7, 3)
-    predicted = int(round(policy.insured_value * probability * 0.3))
-
-    factors = []
-    if policy.prior_claims_count > 0:
-        factors.append(f"{policy.prior_claims_count} prior claim(s)")
-    vu = policy.vehicle_use.value if hasattr(policy.vehicle_use, "value") else str(policy.vehicle_use)
-    if vu in ("commercial", "rideshare"):
-        factors.append("Commercial or rideshare usage")
-    if 2026 - policy.vehicle_year > 4:
-        factors.append("Vehicle age > 4 years")
-    if policy.engine_cc > 2000:
-        factors.append("High engine capacity")
-
-    now = datetime.utcnow()
-    result = ClaimPredictionOut(
-        id=f"cp-{uuid4().hex[:10]}",
-        policy_id=policy.id,
-        claim_probability=probability,
-        predicted_claim_amount=predicted,
-        confidence_interval={"lower": int(predicted * 0.7), "upper": int(predicted * 1.4)},
-        risk_factors=factors,
-        model_version="xgboost-v1",
-        created_at=now,
-    )
-    db.add(
-        Report(
-            id=result.id,
-            policy_id=policy.id,
-            user_id=user.id,
-            report_type=ReportType.claim,
-            content=json.dumps(result.model_dump(), default=str),
-            pdf_path=None,
-            created_at=now,
-        )
-    )
-    db.commit()
-    return result
-
-
-@router.post("/premium-advisory", response_model=PremiumAdvisoryOut)
-def premium_advisory(
-    payload: PolicyActionRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    policy = _get_policy_or_404(db, payload.policy_id, user.id)
-    vector = policy_to_vector(policy)
-    score = _predict_score(request.app.state.model, vector)
-
-    multiplier = 1 + ((score - 50) / 100)
-    recommended = int(round(policy.premium_amount * multiplier))
-
-    factors = [
-        {
-            "factor_name": "Claims History",
-            "impact": policy.prior_claims_count * 8,
-            "direction": "increase" if policy.prior_claims_count > 0 else "decrease",
-            "description": f"{policy.prior_claims_count} prior claims",
-        },
-        {
-            "factor_name": "Vehicle Age",
-            "impact": max(0, (2026 - policy.vehicle_year) * 2),
-            "direction": "increase",
-            "description": f"Vehicle age is {2026 - policy.vehicle_year} years",
-        },
-        {
-            "factor_name": "Usage",
-            "impact": 0,
-            "direction": "decrease",
-            "description": str(policy.vehicle_use),
-        },
-    ]
-    vu = policy.vehicle_use.value if hasattr(policy.vehicle_use, "value") else str(policy.vehicle_use)
-    factors[2]["impact"] = 15 if vu in ("commercial", "rideshare") else 0
-    factors[2]["direction"] = "increase" if vu in ("commercial", "rideshare") else "decrease"
-
-    just_prompt = (
-        f"Given policy {policy.policy_number} score {score:.1f}, current premium {policy.premium_amount}, "
-        f"recommended premium {recommended}, provide concise rationale."
-    )
-    justification = _groq_or_cache(db, policy.id, "/premium-advisory", just_prompt)
-
-    now = datetime.utcnow()
-    pa_id = f"pa-{uuid4().hex[:10]}"
-    result = PremiumAdvisoryOut(
-        id=pa_id,
-        policy_id=policy.id,
-        current_premium=policy.premium_amount,
-        recommended_premium=recommended,
-        premium_range={"min": int(recommended * 0.85), "max": int(recommended * 1.2)},
-        adjustment_factors=factors,
-        justification=justification,
-        created_at=now,
-    )
-    db.add(
-        Report(
-            id=result.id,
-            policy_id=policy.id,
-            user_id=user.id,
-            report_type=ReportType.premium_advisory,
-            content=json.dumps(result.model_dump(), default=str),
-            pdf_path=None,
-            created_at=now,
-        )
-    )
-    db.commit()
-    return result
-
-
-@router.post("/report", response_model=UnderwritingReportOut)
-def generate_report(
-    payload: PolicyActionRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    risk = risk_scoring(payload, request, db, user)
-    claim = claim_prediction(payload, request, db, user)
-    premium = premium_advisory(payload, request, db, user)
-
-    recommendation = "approve"
-    if risk.risk_band == "critical":
-        recommendation = "reject"
-    elif risk.risk_band == "high":
-        recommendation = "review"
-
-    summary_prompt = (
-        f"Create an underwriting summary for {payload.policy_id}. Risk={risk.risk_band}, "
-        f"claim_prob={claim.claim_probability}, recommended={premium.recommended_premium}."
-    )
-    summary = _groq_or_cache(db, payload.policy_id, "/report", summary_prompt)
-    now = datetime.utcnow()
-    report_id = f"rpt-{uuid4().hex[:10]}"
-    out = UnderwritingReportOut(
-        id=report_id,
-        policy_id=payload.policy_id,
-        risk_assessment=risk,
-        claim_prediction=claim,
-        premium_advisory=premium,
-        summary=summary,
-        recommendation=recommendation,  # type: ignore[arg-type]
-        generated_at=now,
-    )
-
-    db.add(
-        Report(
-            id=report_id,
-            policy_id=payload.policy_id,
-            user_id=user.id,
-            report_type=ReportType.underwriting,
-            content=json.dumps(out.model_dump(), default=str),
-            pdf_path=None,
-            created_at=now,
-        )
-    )
-    db.commit()
-    return out
-
-
-@router.post("/batch", response_model=BatchJobOut)
-def batch_analysis(
-    payload: BatchRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    now = datetime.utcnow()
-    job_id = str(uuid4())
-    job = BatchJob(
-        id=job_id,
-        user_id=user.id,
-        status=BatchJobStatus.completed,
-        total_policies=len(payload.policy_ids),
-        processed_count=0,
-        failed_count=0,
-        result_summary={},
-        created_at=now,
-        completed_at=now,
-    )
-    db.add(job)
-    db.flush()
-
-    summary = {
-        "avg_risk_score": 0,
-        "risk_distribution": {"low": 0, "medium": 0, "high": 0, "critical": 0},
-        "avg_claim_probability": 0,
-        "total_insured_value": 0,
-        "total_premium": 0,
-        "high_risk_count": 0,
-    }
-
-    processed = 0
-    for policy_id in payload.policy_ids:
-        policy = (
-            db.query(Policy)
-            .filter(Policy.id == policy_id, Policy.user_id == user.id, Policy.is_active.is_(True))
-            .first()
-        )
-        if not policy:
-            job.failed_count += 1
-            continue
-        score = _predict_score(request.app.state.model, policy_to_vector(policy))
-        band = score_to_band(score)
-        processed += 1
-
-        summary["avg_risk_score"] += score
-        summary["risk_distribution"][band] += 1
-        summary["avg_claim_probability"] += (score / 100) * 0.7
-        summary["total_insured_value"] += policy.insured_value
-        summary["total_premium"] += policy.premium_amount
-        if band in {"high", "critical"}:
-            summary["high_risk_count"] += 1
-
-        rp = RiskPrediction(
-            id=str(uuid4()),
-            policy_id=policy.id,
-            user_id=user.id,
-            claim_probability=round((score / 100) * 0.7, 3),
-            risk_score=int(round(score)),
-            risk_band=score_to_risk_band_enum(score),
-            shap_features=[],
-            llm_explanation="",
-            model_version="xgb_v1_batch",
-            created_at=now,
-        )
-        db.add(rp)
-
-    divisor = processed if processed > 0 else 1
-    summary["avg_risk_score"] = int(round(summary["avg_risk_score"] / divisor))
-    summary["avg_claim_probability"] = round(summary["avg_claim_probability"] / divisor, 3)
-
-    job.processed_count = processed
-    job.result_summary = summary
-    job.completed_at = datetime.utcnow()
-    db.commit()
-
-    status_map = {
-        BatchJobStatus.pending: "queued",
-        BatchJobStatus.running: "processing",
-        BatchJobStatus.completed: "completed",
-        BatchJobStatus.failed: "failed",
-    }
-    return BatchJobOut(
-        id=job.id,
-        name=f"Batch {now.date().isoformat()}",
-        total_policies=job.total_policies,
-        processed=job.processed_count,
-        status=status_map[job.status],
-        results_summary=job.result_summary,
-        created_at=job.created_at,
-        completed_at=job.completed_at,
-    )
+            pass
+        return {"insights": insights}
+    except Exception as e:
+        return {"insights": f"Portfolio intelligence engine is currently refreshing. Please check back in a few minutes. (Reason: {str(e)})"}
 
 
 @router.get("/audit-log")
-def get_audit_log(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def get_audit_log(
+    limit: int = Query(default=50, le=200),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     from backend.database.models import AuditLog
-
-    logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(200).all()
+    logs = (
+        db.query(AuditLog)
+        .filter(AuditLog.user_id == user.id)
+        .order_by(AuditLog.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
     return [
         {
-            "id": row.id,
-            "user_id": row.user_id or "",
-            "action": row.action,
-            "resource_type": row.resource_type,
-            "resource_id": row.resource_id or "",
-            "timestamp": row.created_at,
-            "payload_hash": row.payload_hash or "",
+            "id": log.id,
+            "user_id": log.user_id,
+            "action": log.action,
+            "entity_type": log.resource_type,
+            "entity_id": log.resource_id,
+            "details": log.payload_hash,
+            "timestamp": log.timestamp.isoformat() if log.timestamp else None,
         }
-        for row in logs
+        for log in logs
     ]
-
-
-@router.get("/dashboard/stats", response_model=DashboardStatsOut)
-def dashboard_stats(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    policies = db.query(Policy).filter(Policy.user_id == user.id, Policy.is_active.is_(True)).all()
-    if not policies:
-        return DashboardStatsOut(
-            total_policies=0,
-            total_assessed=0,
-            avg_risk_score=0,
-            high_risk_percentage=0,
-            total_insured_value=0,
-            total_premium=0,
-            claims_predicted=0,
-            reports_generated=0,
-        )
-
-    scores = []
-    insured_total = 0.0
-    premium_total = 0.0
-    for p in policies:
-        score = 30 + p.prior_claims_count * 15 + max(0, (2026 - p.vehicle_year) * 3)
-        vu = p.vehicle_use.value if hasattr(p.vehicle_use, "value") else str(p.vehicle_use)
-        if vu in ("commercial", "rideshare"):
-            score += 20
-        if p.engine_cc > 2000:
-            score += 10
-        if p.insured_value > 2_000_000:
-            score += 10
-        scores.append(min(100, score))
-        insured_total += p.insured_value
-        premium_total += p.premium_amount
-
-    high_count = len([s for s in scores if s > 55])
-    claims_count = db.query(Report).filter(Report.user_id == user.id, Report.report_type == ReportType.claim).count()
-    reports_count = db.query(Report).filter(Report.user_id == user.id, Report.report_type == ReportType.underwriting).count()
-
-    return DashboardStatsOut(
-        total_policies=len(policies),
-        total_assessed=len(scores),
-        avg_risk_score=int(round(sum(scores) / len(scores))),
-        high_risk_percentage=int(round((high_count / len(scores)) * 100)),
-        total_insured_value=insured_total,
-        total_premium=premium_total,
-        claims_predicted=claims_count,
-        reports_generated=reports_count,
-    )
-

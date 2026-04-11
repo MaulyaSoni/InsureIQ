@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -130,15 +130,21 @@ def _run_batch_job(job_id: str, policy_ids: list[str], user_id: str) -> None:
         db.close()
 
 
+@router.post("")
 @router.post("/run")
 async def batch_run(
     background_tasks: BackgroundTasks,
-    policy_ids: Optional[list[str]] = None,
+    request: Request,
     file: UploadFile = File(None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     ids: list[str] = []
+    
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
 
     if file:
         if not file.filename.endswith(".csv"):
@@ -154,8 +160,8 @@ async def batch_run(
                 ids = df.iloc[:, 0].dropna().astype(str).tolist()
         except Exception as exc:
             raise HTTPException(status_code=400, detail={"error": "PARSE_ERROR", "detail": f"Could not parse CSV: {exc}"}) from exc
-    elif policy_ids:
-        ids = [str(i).strip() for i in policy_ids if str(i).strip()]
+    elif isinstance(body.get("policy_ids"), list):
+        ids = [str(i).strip() for i in body.get("policy_ids", []) if str(i).strip()]
     else:
         raise HTTPException(status_code=400, detail={"error": "FIELD_VALIDATION_ERROR", "detail": "Provide policy_ids list or CSV file"})
 
