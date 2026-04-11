@@ -1,1 +1,0 @@
-﻿{"error":"FIELD_VALIDATION_ERROR","detail":"value is not a valid email address: The part after the @-sign is a special-use or reserved name that cannot be used with email.","field":"email"}

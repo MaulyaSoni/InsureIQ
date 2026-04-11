@@ -55,6 +55,7 @@ class PolicyCreate(BaseModel):
     annual_mileage_km: int | None = Field(default=None, ge=0, le=500_000)
     ncb_percentage: float = Field(default=0.0, ge=0, le=100)
     policy_start_date: date | None = None
+    policy_end_date: date | None = Field(default=None)
     policy_duration_months: int | None = Field(default=None, ge=1, le=120)
 
     @model_validator(mode="after")
@@ -97,6 +98,9 @@ class PolicyCreate(BaseModel):
             object.__setattr__(self, "policy_start_date", date.today())
         if self.policy_duration_months is None:
             object.__setattr__(self, "policy_duration_months", 12)
+        if self.policy_end_date is None and self.policy_start_date is not None:
+            from datetime import timedelta
+            object.__setattr__(self, "policy_end_date", self.policy_start_date + timedelta(days=self.policy_duration_months * 30))
         _engine_cc_bounds(self.engine_cc)
         return self
 
@@ -187,6 +191,7 @@ class PolicyOut(BaseModel):
     usage_type: Literal["personal", "commercial", "taxi", "fleet"]
     prior_claims: int
     region: str
+    policy_end_date: date | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -213,6 +218,7 @@ class PolicyOut(BaseModel):
             usage_type=ut,
             prior_claims=p.prior_claims_count,
             region=p.city,
+            policy_end_date=p.policy_end_date,
             created_at=p.created_at,
             updated_at=p.updated_at,
         )

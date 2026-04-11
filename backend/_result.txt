@@ -1,9 +1,0 @@
-Demo user exists: True
-Policies=300, Predictions=300
-  CRITICAL: 2 (0.7%)
-  HIGH: 22 (7.3%)
-  LOW: 2 (0.7%)
-  MEDIUM: 274 (91.3%)
-  Lakshmi Thakur | Maruti Suzuki WagonR | Pune | Rs.150,000
-  Gunjan Pandit | Maruti Suzuki Brezza | Srinagar | Rs.196,000
-  Bhavna Solanki | Volkswagen Polo | Bengaluru | Rs.150,000

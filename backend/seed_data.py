@@ -408,6 +408,8 @@ def seed_db():
 
         start_offset_days = random.randint(0, 730)
         policy_start = date.today() - timedelta(days=start_offset_days)
+        pol_duration = random.choice([12, 12, 24, 36])
+        pol_duration_days = pol_duration * 30
 
         policy_dict = {
             "id": str(uuid.uuid4()),
@@ -430,7 +432,8 @@ def seed_db():
             "annual_mileage_km": annual_km,
             "ncb_percentage": float(ncb),
             "policy_start_date": policy_start,
-            "policy_duration_months": random.choice([12, 12, 24, 36]),
+            "policy_end_date": policy_start + timedelta(days=pol_duration_days),
+            "policy_duration_months": pol_duration,
             "is_active": True,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),

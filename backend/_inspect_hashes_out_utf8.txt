@@ -1,6 +1,0 @@
-t1@test.com	len=60	prefix=$2b$12$LTO7K
-ab@gmail.com	len=60	prefix=$2b$12$RYecR
-debug_user_1775135826@example.com	len=60	prefix=$2b$12$6AZaV
-debuguser@example.com	len=60	prefix=$2b$12$VKz23
-demo@insureiq.local	len=60	prefix=$2b$12$yhQNt
-abc@gmail.com	len=60	prefix=$2b$12$AlnKu

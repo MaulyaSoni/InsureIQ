@@ -107,6 +107,7 @@ class Policy(Base):
     annual_mileage_km: Mapped[int] = mapped_column(Integer, nullable=False)
     ncb_percentage: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     policy_start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    policy_end_date: Mapped[date] = mapped_column(Date, nullable=True)
     policy_duration_months: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
