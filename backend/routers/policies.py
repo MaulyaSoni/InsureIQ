@@ -11,21 +11,18 @@ from backend.auth.dependencies import get_current_user
 from backend.database.db import get_db
 from backend.database.models import ParkingType, Policy, RiskPrediction, User, VehicleUse
 from backend.database.repository import (
-    get_latest_risk_prediction_for_policies,
-    invalidate_risk_predictions,
-    list_policies_paginated,
+    PolicyRepository,
+    RiskPredictionRepository,
 )
 from backend.ml import policy_to_vector, score_to_risk_band_enum
 from backend.schemas.policy import (
     CSVImportResponse,
-    CSVImportRowError,
     PolicyCreate,
-    PolicyDetailOut,
-    PolicyListOut,
-    PolicyOut,
+    PolicyListResponse,
+    PolicyResponse,
     PolicyUpdate,
-    RiskPredictionSummary,
 )
+from backend.utils.errors import error_response
 
 router = APIRouter(prefix="/policies", tags=["policies"], dependencies=[Depends(get_current_user)])
 
@@ -52,12 +49,10 @@ _SAMPLE_COLUMNS = [
 ]
 
 
-def _to_policy_out(p: Policy) -> PolicyOut:
-    return PolicyOut.from_orm_policy(p)
+# --- Sample CSV ---
 
 
 def _policy_to_create_dict(row: dict) -> dict:
-    """Normalize CSV row keys to PolicyCreate fields."""
     out = {k: row.get(k) for k in _SAMPLE_COLUMNS if k in row}
     if "holder_name" in row and "policyholder_name" not in out:
         out["policyholder_name"] = row["holder_name"]
@@ -118,26 +113,21 @@ async def import_csv(
     try:
         df = pd.read_csv(io.BytesIO(raw))
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "FIELD_VALIDATION_ERROR", "detail": f"Invalid CSV: {exc}"},
-        ) from exc
+        error_response(status.HTTP_400_BAD_REQUEST, "INVALID_CSV", f"Invalid CSV: {exc}")
 
     imported = 0
-    errors: list[CSVImportRowError] = []
+    errors: list[dict] = []
     for idx, row in df.iterrows():
         row_index = int(idx) + 2
         try:
             payload_dict = _policy_to_create_dict(row.to_dict())
             payload = PolicyCreate.model_validate(payload_dict)
         except Exception as exc:
-            errors.append(CSVImportRowError(row_index=row_index, message=str(exc)))
+            errors.append({"row": row_index, "error": str(exc)})
             continue
         exists = db.query(Policy).filter(Policy.policy_number == payload.policy_number).first()
         if exists:
-            errors.append(
-                CSVImportRowError(row_index=row_index, message="Duplicate policy_number", field="policy_number")
-            )
+            errors.append({"row": row_index, "field": "policy_number", "error": "Duplicate policy_number"})
             continue
         now = datetime.utcnow()
         p = Policy(
@@ -149,13 +139,13 @@ async def import_csv(
             vehicle_year=payload.vehicle_year,
             engine_cc=payload.engine_cc,
             seating_capacity=payload.seating_capacity,
-            vehicle_use=VehicleUse(payload.vehicle_use.value),
+            vehicle_use=VehicleUse(payload.vehicle_use),
             insured_value=float(payload.insured_value),
             premium_amount=float(payload.premium_amount),
             prior_claims_count=payload.prior_claims_count or 0,
             prior_claim_amount=float(payload.prior_claim_amount),
             anti_theft_device=bool(payload.anti_theft_device),
-            parking_type=ParkingType(payload.parking_type.value),
+            parking_type=ParkingType(payload.parking_type),
             city=payload.city,
             annual_mileage_km=payload.annual_mileage_km or 12_000,
             ncb_percentage=float(payload.ncb_percentage),
@@ -171,7 +161,7 @@ async def import_csv(
     return CSVImportResponse(imported=imported, failed=len(errors), errors=errors[:200])
 
 
-@router.get("", response_model=PolicyListOut)
+@router.get("", response_model=PolicyListResponse)
 def list_policies(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=1000),
@@ -179,22 +169,21 @@ def list_policies(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    rows, total = list_policies_paginated(db, user.id, page=page, limit=limit, risk_band=risk_band)
-    return PolicyListOut(
-        items=[_to_policy_out(p) for p in rows],
+    skip = (page - 1) * limit
+    rows = PolicyRepository.get_all(db, user.id, skip=skip, limit=limit, risk_band=risk_band)
+    total = PolicyRepository.count(db, user.id)
+    return PolicyListResponse(
+        policies=[PolicyResponse.model_validate(p) for p in rows],
         page=page,
         limit=limit,
         total=total,
     )
 
 
-@router.post("", response_model=PolicyOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PolicyResponse, status_code=status.HTTP_201_CREATED)
 def create_policy(payload: PolicyCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if db.query(Policy).filter(Policy.policy_number == payload.policy_number).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "FIELD_VALIDATION_ERROR", "detail": "Policy number already exists", "field": "policy_number"},
-        )
+        error_response(status.HTTP_400_BAD_REQUEST, "POLICY_ALREADY_EXISTS", "Policy number already exists", "policy_number")
     now = datetime.utcnow()
     row = Policy(
         user_id=user.id,
@@ -205,13 +194,13 @@ def create_policy(payload: PolicyCreate, db: Session = Depends(get_db), user: Us
         vehicle_year=payload.vehicle_year,
         engine_cc=payload.engine_cc,
         seating_capacity=payload.seating_capacity,
-        vehicle_use=VehicleUse(payload.vehicle_use.value),
+        vehicle_use=VehicleUse(payload.vehicle_use),
         insured_value=float(payload.insured_value),
         premium_amount=float(payload.premium_amount),
         prior_claims_count=payload.prior_claims_count or 0,
         prior_claim_amount=float(payload.prior_claim_amount),
         anti_theft_device=bool(payload.anti_theft_device),
-        parking_type=ParkingType(payload.parking_type.value),
+        parking_type=ParkingType(payload.parking_type),
         city=payload.city,
         annual_mileage_km=payload.annual_mileage_km or 12_000,
         ncb_percentage=float(payload.ncb_percentage),
@@ -224,7 +213,7 @@ def create_policy(payload: PolicyCreate, db: Session = Depends(get_db), user: Us
     db.add(row)
     db.commit()
     db.refresh(row)
-    return _to_policy_out(row)
+    return PolicyResponse.model_validate(row)
 
 
 @router.get("/{policy_id}/predictions")
@@ -239,7 +228,7 @@ def list_policy_predictions(
         .first()
     )
     if not pol:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error": "NOT_FOUND", "detail": "Policy not found"})
+        error_response(status.HTTP_404_NOT_FOUND, "POLICY_NOT_FOUND", "Policy not found")
     rows = (
         db.query(RiskPrediction)
         .filter(RiskPrediction.policy_id == policy_id)
@@ -262,112 +251,54 @@ def list_policy_predictions(
     ]
 
 
-@router.get("/{policy_id}", response_model=PolicyDetailOut)
+@router.get("/{policy_id}", response_model=PolicyResponse)
 def get_policy(policy_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    row = (
-        db.query(Policy)
-        .filter(Policy.id == policy_id, Policy.user_id == user.id, Policy.is_active.is_(True))
-        .first()
-    )
-    if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error": "NOT_FOUND", "detail": "Policy not found"})
-    latest = None
-    try:
-        latest = get_latest_risk_prediction_for_policies(db, [policy_id]).get(policy_id)
-    except Exception:
-        # Legacy rows with invalid enum values should not break policy details.
-        latest = None
+    row = PolicyRepository.get_by_id(db, policy_id, user.id)
+    if not row or not row.is_active:
+        error_response(status.HTTP_404_NOT_FOUND, "POLICY_NOT_FOUND", "Policy not found")
+    
+    latest = RiskPredictionRepository.get_latest_for_policy(db, policy_id)
     summary = None
     if latest:
-        summary = RiskPredictionSummary(
-            id=latest.id,
-            claim_probability=latest.claim_probability,
-            risk_score=latest.risk_score,
-            risk_band=latest.risk_band.value,
-            model_version=latest.model_version,
-            created_at=latest.created_at,
-        )
-    base = _to_policy_out(row)
-    return PolicyDetailOut(**base.model_dump(), latest_risk_prediction=summary)
+        summary = {
+            "id": latest.id,
+            "claim_probability": latest.claim_probability,
+            "risk_score": latest.risk_score,
+            "risk_band": latest.risk_band.value,
+            "model_version": latest.model_version,
+            "created_at": latest.created_at.isoformat(),
+        }
+    res = PolicyResponse.model_validate(row)
+    res.latest_risk_prediction = summary
+    return res
 
 
-@router.put("/{policy_id}", response_model=PolicyOut)
+@router.put("/{policy_id}", response_model=PolicyResponse)
 def update_policy(
     policy_id: str,
     payload: PolicyUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    row = (
-        db.query(Policy)
-        .filter(Policy.id == policy_id, Policy.user_id == user.id, Policy.is_active.is_(True))
-        .first()
-    )
-    if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error": "NOT_FOUND", "detail": "Policy not found"})
+    row = PolicyRepository.get_by_id(db, policy_id, user.id)
+    if not row or not row.is_active:
+        error_response(status.HTTP_404_NOT_FOUND, "POLICY_NOT_FOUND", "Policy not found")
 
-    data = payload.model_dump(exclude_unset=True, mode="python")
-    if "holder_name" in data:
-        if not data.get("policyholder_name"):
-            data["policyholder_name"] = data.pop("holder_name")
-        else:
-            data.pop("holder_name", None)
-    if "production_year" in data and data.get("vehicle_year") is None:
-        data["vehicle_year"] = data.pop("production_year")
-    if "seats" in data and data.get("seating_capacity") is None:
-        data["seating_capacity"] = data.pop("seats")
-    if "prior_claims" in data and data.get("prior_claims_count") is None:
-        data["prior_claims_count"] = data.pop("prior_claims")
-    if "region" in data and data.get("city") is None:
-        data["city"] = data.pop("region")
-    if "usage_type" in data and data.get("vehicle_use") is None:
-        ut = str(data.pop("usage_type")).lower().strip()
-        from backend.schemas.policy import VehicleUse as VU
-
-        if ut in ("taxi", "fleet"):
-            data["vehicle_use"] = VU.rideshare
-        elif ut == "commercial":
-            data["vehicle_use"] = VU.commercial
-        else:
-            data["vehicle_use"] = VU.personal
-
-    field_map = {
-        "policyholder_name": "policyholder_name",
-        "vehicle_make": "vehicle_make",
-        "vehicle_model": "vehicle_model",
-        "vehicle_year": "vehicle_year",
-        "engine_cc": "engine_cc",
-        "seating_capacity": "seating_capacity",
-        "vehicle_use": "vehicle_use",
-        "insured_value": "insured_value",
-        "premium_amount": "premium_amount",
-        "prior_claims_count": "prior_claims_count",
-        "prior_claim_amount": "prior_claim_amount",
-        "anti_theft_device": "anti_theft_device",
-        "parking_type": "parking_type",
-        "city": "city",
-        "annual_mileage_km": "annual_mileage_km",
-        "ncb_percentage": "ncb_percentage",
-        "policy_start_date": "policy_start_date",
-        "policy_duration_months": "policy_duration_months",
-    }
-    changed = False
-    for pydantic_name, orm_name in field_map.items():
-        if pydantic_name not in data:
-            continue
-        val = data[pydantic_name]
-        if orm_name == "vehicle_use" and val is not None:
-            val = VehicleUse(val.value if hasattr(val, "value") else val)
-        if orm_name == "parking_type" and val is not None:
-            val = ParkingType(val.value if hasattr(val, "value") else val)
-        setattr(row, orm_name, val)
-        changed = True
-    if changed:
-        row.updated_at = datetime.utcnow()
-        invalidate_risk_predictions(db, policy_id)
-        db.commit()
-        db.refresh(row)
-    return _to_policy_out(row)
+    data = payload.model_dump(exclude_unset=True)
+    
+    for key, value in data.items():
+        if key == "vehicle_use" and value is not None:
+            value = VehicleUse(value)
+        if key == "parking_type" and value is not None:
+            value = ParkingType(value)
+        setattr(row, key, value)
+    
+    row.updated_at = datetime.utcnow()
+    # Manual invalidation since we don't have a standalone function anymore
+    db.query(RiskPrediction).filter(RiskPrediction.policy_id == policy_id).delete(synchronize_session=False)
+    db.commit()
+    db.refresh(row)
+    return PolicyResponse.model_validate(row)
 
 
 @router.delete("/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -376,16 +307,9 @@ def delete_policy(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    row = (
-        db.query(Policy)
-        .filter(Policy.id == policy_id, Policy.user_id == user.id, Policy.is_active.is_(True))
-        .first()
-    )
-    if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error": "NOT_FOUND", "detail": "Policy not found"})
-    row.is_active = False
-    row.updated_at = datetime.utcnow()
-    db.commit()
+    success = PolicyRepository.soft_delete(db, policy_id, user.id)
+    if not success:
+        error_response(status.HTTP_404_NOT_FOUND, "POLICY_NOT_FOUND", "Policy not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -420,13 +344,9 @@ def run_all_analysis(
 ):
     from backend.agents.graph import insureiq_graph
 
-    row = (
-        db.query(Policy)
-        .filter(Policy.id == policy_id, Policy.user_id == user.id, Policy.is_active.is_(True))
-        .first()
-    )
-    if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error": "NOT_FOUND", "detail": "Policy not found"})
+    row = PolicyRepository.get_by_id(db, policy_id, user.id)
+    if not row or not row.is_active:
+        error_response(status.HTTP_404_NOT_FOUND, "POLICY_NOT_FOUND", "Policy not found")
 
     state = {
         "policy_id": row.id,

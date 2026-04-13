@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const VISHLESHAK_CONFIG_KEY = "insureiq_vishleshak_config";
 
 function getToken() {
@@ -15,7 +15,7 @@ export function clearAuthToken() {
 
 export function getVishleshakConfig() {
   const fallback = {
-    base_url: `${window.location.origin}/api`,
+    base_url: `${BASE_URL}`,
     api_key: "",
     timeout_ms: 30000,
     retry_count: 1,
@@ -46,7 +46,7 @@ async function request(path: string, options: RequestInit = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers,
   });

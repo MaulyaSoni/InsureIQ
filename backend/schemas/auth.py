@@ -1,41 +1,44 @@
-from pydantic import BaseModel, EmailStr, Field, computed_field, model_validator
+import re
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class SignupRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
-    full_name: str | None = Field(default=None, max_length=255)
-    name: str | None = Field(default=None, max_length=255)
+    full_name: str = Field(..., min_length=2, max_length=100)
+    password: str = Field(..., min_length=8)
 
-    @model_validator(mode="after")
-    def resolve_full_name(self):
-        if self.full_name and self.full_name.strip():
-            self.full_name = self.full_name.strip()
-        elif self.name and self.name.strip():
-            self.full_name = self.name.strip()
-        else:
-            self.full_name = self.email.split("@")[0]
-        return self
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain at least one special character")
+        return v
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=1, max_length=128)
+    password: str
 
 
-class TokenUserOut(BaseModel):
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    full_name: str
+    email: str
+
+
+class UserResponse(BaseModel):
     id: str
     email: str
     full_name: str
+    is_active: bool
+    created_at: datetime
 
-    @computed_field
-    @property
-    def name(self) -> str:
-        return self.full_name
-
-
-class AuthResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
-    user: TokenUserOut
+    model_config = ConfigDict(from_attributes=True)
