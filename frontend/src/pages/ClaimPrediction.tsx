@@ -14,7 +14,7 @@ import {
   ChevronDown,
   CheckCircle,
 } from "lucide-react";
-import { getPolicies, getPolicy, predictClaim } from "@/lib/api";
+import { getPolicies, getPolicy, predictClaim, checkClaimEligibility } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function ClaimPrediction() {
@@ -25,6 +25,8 @@ export default function ClaimPrediction() {
   const [selectedPolicyId, setSelectedPolicyId] = useState(policyId || "");
   const [policy, setPolicy] = useState<any>(null);
   const [prediction, setPrediction] = useState<any>(null);
+  const [eligibility, setEligibility] = useState<any>(null);
+  const [incidentData, setIncidentData] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -58,8 +60,19 @@ export default function ClaimPrediction() {
     if (!selectedPolicyId) return;
     setAnalyzing(true);
     try {
-      const result = await predictClaim(selectedPolicyId);
-      setPrediction(result);
+      const predResult = await predictClaim(selectedPolicyId);
+      setPrediction(predResult);
+
+      if (incidentData.incident_type && incidentData.date_of_incident) {
+        const eligResult = await checkClaimEligibility({
+          policy_id: selectedPolicyId,
+          ...incidentData,
+          third_party_involved: false,
+          hours_since_incident: 24,
+          damage_estimate_inr: 0,
+        });
+        setEligibility(eligResult);
+      }
       toast.success("Intelligence assessment stream finalized");
     } catch (err: any) {
       toast.error(err.message || "Prediction node error");
@@ -106,25 +119,27 @@ export default function ClaimPrediction() {
               
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span className="nu-muted" style={{ fontSize: 12 }}>Incident Type</span>
-                <select className="nu-select" style={{ padding: 8 }}>
-                  <option value="Accident">Accident / Collision</option>
-                  <option value="Theft">Total Theft</option>
-                  <option value="Natural">Natural Calamity</option>
-                  <option value="Fire">Fire / Explosion</option>
+                <select className="nu-select" style={{ padding: 8 }} onChange={(e) => setIncidentData({ ...incidentData, incident_type: e.target.value })}>
+                  <option value="">Select type...</option>
+                  <option value="accident">Accident / Collision</option>
+                  <option value="theft">Total Theft</option>
+                  <option value="vandalism">Vandalism</option>
+                  <option value="flood">Natural Calamity</option>
+                  <option value="fire">Fire / Explosion</option>
                 </select>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span className="nu-muted" style={{ fontSize: 12 }}>Incident Date</span>
                 <div style={{ position: "relative" }}>
-                  <input type="date" className="nu-input" style={{ padding: 8 }} />
+                  <input type="date" className="nu-input" style={{ padding: 8 }} onChange={(e) => setIncidentData({ ...incidentData, date_of_incident: e.target.value })} />
                 </div>
               </div>
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span className="nu-muted" style={{ fontSize: 12 }}>FIR Report Filed?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" defaultChecked />
+                  <input type="checkbox" className="sr-only peer" defaultChecked onChange={(e) => setIncidentData({ ...incidentData, fir_filed: e.target.checked })} />
                   <div className="w-9 h-5 bg-nu-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
                 </label>
               </div>
@@ -132,7 +147,7 @@ export default function ClaimPrediction() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span className="nu-muted" style={{ fontSize: 12 }}>Policyholder at Fault?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
+                  <input type="checkbox" className="sr-only peer" onChange={(e) => setIncidentData({ ...incidentData, at_fault: e.target.checked })} />
                   <div className="w-9 h-5 bg-nu-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
                 </label>
               </div>

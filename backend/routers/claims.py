@@ -1,7 +1,8 @@
+import json
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user
@@ -10,6 +11,8 @@ from backend.database.models import Policy, User
 from backend.llm.groq_client import invoke_llm
 from backend.ml.feature_engineer import policy_orm_to_dict, policy_to_feature_vector
 from backend.ml.risk_scorer import probability_to_risk_score, risk_score_to_band
+from backend.schemas.claim import ClaimAssessment, ClaimEligibilityRequest
+from backend.utils.errors import error_response
 
 router = APIRouter(prefix="/claims", tags=["claims"], dependencies=[Depends(get_current_user)])
 
@@ -61,7 +64,7 @@ def predict_claim(
 ):
     policy_id = str(payload.get("policy_id", "")).strip()
     if not policy_id:
-        raise HTTPException(status_code=400, detail={"error": "FIELD_VALIDATION_ERROR", "field": "policy_id", "detail": "policy_id is required"})
+        error_response(400, "FIELD_VALIDATION_ERROR", "policy_id is required", "policy_id")
 
     policy = (
         db.query(Policy)
@@ -69,7 +72,7 @@ def predict_claim(
         .first()
     )
     if not policy:
-        raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "detail": "Policy not found"})
+        error_response(404, "POLICY_NOT_FOUND", "Policy not found")
 
     data = policy_orm_to_dict(policy)
     vector, _ = policy_to_feature_vector(data)
@@ -99,133 +102,83 @@ def predict_claim(
     }
 
 
-@router.post("/eligibility")
+@router.post("/eligibility", response_model=ClaimAssessment)
 def claim_eligibility(
-    payload: dict,
-    request: Request,
+    payload: ClaimEligibilityRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    policy_id = str(payload.get("policy_id", "")).strip()
-    raw_message = str(payload.get("message", "")).strip()
+    policy = (
+        db.query(Policy)
+        .filter(Policy.id == payload.policy_id, Policy.user_id == user.id, Policy.is_active.is_(True))
+        .first()
+    )
+    if not policy:
+        error_response(404, "POLICY_NOT_FOUND", "Policy not found")
 
-    policy = None
-    if policy_id:
-        policy = (
-            db.query(Policy)
-            .filter(Policy.id == policy_id, Policy.user_id == user.id, Policy.is_active.is_(True))
-            .first()
+    rejection_risks = []
+    if payload.hours_since_incident > 48 and payload.incident_type == "theft":
+        rejection_risks.append("Theft intimation beyond 24-hour IRDAI requirement")
+    if payload.hours_since_incident > 72:
+        rejection_risks.append("Late intimation may reduce claim settlement amount")
+    if not payload.fir_filed and payload.incident_type in ["theft", "accident"]:
+        rejection_risks.append("FIR not filed — required for this incident type")
+
+    coverage_note = ""
+    if payload.third_party_involved:
+        coverage_note = "Third-party policy — own damage NOT covered. "
+
+    system_prompt = """You are a claim eligibility specialist for Indian motor insurance.
+Return ONLY valid JSON matching this exact structure — no other text:
+{
+  "claim_type": "own_damage|third_party|theft|total_loss|not_eligible",
+  "eligible": true|false,
+  "eligibility_reason": "string",
+  "risk_of_rejection": "LOW|MEDIUM|HIGH",
+  "documents_required": ["list", "of", "documents"],
+  "ncb_impact": "NCB will be lost|NCB protected|Not applicable|NCB protect add-on applies",
+  "estimated_claim_range": "₹X – ₹Y (subject to surveyor assessment)",
+  "next_steps": ["Step 1", "Step 2", "Step 3"]
+}"""
+
+    user_prompt = f"""Assess claim eligibility:
+Policy: {policy.vehicle_make} {policy.vehicle_model} {policy.vehicle_year}
+Vehicle use: {policy.vehicle_use}
+Prior claims: {policy.prior_claims_count}
+Incident: {payload.incident_type}
+Date: {payload.date_of_incident}
+At fault: {payload.at_fault}
+FIR filed: {payload.fir_filed}
+Third party involved: {payload.third_party_involved}
+Hours since incident: {payload.hours_since_incident}
+Damage estimate: ₹{payload.damage_estimate_inr:,.0f}
+{coverage_note}
+Known rejection risks: {', '.join(rejection_risks) if rejection_risks else 'None'}
+
+Return JSON assessment only."""
+
+    raw = invoke_llm("extractor", system_prompt, user_prompt, expect_json=True)
+
+    try:
+        data = json.loads(raw)
+        existing = data.get("rejection_risks", [])
+        data["rejection_risks"] = list(set(existing + rejection_risks))
+        return ClaimAssessment(policy_id=payload.policy_id, **data)
+    except (json.JSONDecodeError, Exception):
+        return ClaimAssessment(
+            policy_id=payload.policy_id,
+            claim_type="own_damage",
+            eligible=len(rejection_risks) == 0,
+            eligibility_reason=f"Assessment based on policy rules. {coverage_note}",
+            risk_of_rejection="HIGH" if len(rejection_risks) > 1 else "MEDIUM",
+            rejection_risks=rejection_risks,
+            documents_required=["Completed claim form", "RC copy", "Driving licence", "FIR copy (if applicable)", "Repair estimate"],
+            ncb_impact="NCB will be lost" if payload.at_fault else "NCB protected",
+            estimated_claim_range=f"₹{min(payload.damage_estimate_inr, policy.insured_value * 0.8):,.0f} (subject to surveyor assessment)",
+            next_steps=[
+                "Step 1: Intimate insurer within 24 hours",
+                "Step 2: File FIR if not done",
+                "Step 3: Get repair estimate from authorised garage",
+                "Step 4: Submit claim form with documents",
+            ],
         )
-
-    coverage_type = str(payload.get("coverage_type", "")).lower()
-    incident_type = str(payload.get("incident_type", "")).lower()
-    hours_since = payload.get("hours_since_incident")
-    at_fault = payload.get("at_fault")
-    third_party = payload.get("third_party_involved")
-    fir_filed = payload.get("police_fir_filed")
-    damage_amount = payload.get("estimated_damage_amount")
-
-    if raw_message and not incident_type:
-        try:
-            json_str = invoke_llm(
-                "reasoner",
-                CLAIM_EXTRACTION_PROMPT.format(message=raw_message),
-                "",
-                expect_json=True,
-            )
-            if json_str:
-                try:
-                    extracted = eval(json_str)
-                except Exception:
-                    try:
-                        import json
-                        extracted = json.loads(json_str)
-                    except Exception:
-                        extracted = {}
-                if isinstance(extracted, dict):
-                    coverage_type = coverage_type or str(extracted.get("coverage_type") or "")
-                    incident_type = incident_type or str(extracted.get("incident_type") or "")
-                    hours_since = hours_since if hours_since is not None else extracted.get("hours_since_incident")
-                    at_fault = at_fault if at_fault is not None else extracted.get("at_fault")
-                    third_party = third_party if third_party is not None else extracted.get("third_party_involved")
-                    fir_filed = fir_filed if fir_filed is not None else extracted.get("police_fir_filed")
-                    damage_amount = damage_amount or extracted.get("estimated_damage_amount")
-        except Exception:
-            pass
-
-    missing = []
-    if not coverage_type:
-        missing.append("coverage_type")
-    if not incident_type:
-        missing.append("incident_type")
-    if fir_filed is None:
-        missing.append("police_fir_filed")
-
-    if missing:
-        return {
-            "eligible": None,
-            "status": "NEED_MORE_INFO",
-            "missing_fields": missing,
-            "next_steps": "Provide missing claim details for final eligibility decision.",
-        }
-
-    eligible = True
-    reasons: list[str] = []
-    risk_flags: list[str] = []
-    recommendation: str = "ELIGIBLE"
-
-    if policy and not policy.is_active:
-        eligible = False
-        reasons.append("Policy is not active.")
-
-    if coverage_type == "third_party_only" and incident_type in {"accident", "vandalism", "fire", "flood", "wind"}:
-        eligible = False
-        reasons.append("Third-party-only policy does not cover own-damage incidents.")
-        recommendation = "NOT_ELIGIBLE"
-
-    if incident_type == "theft":
-        if fir_filed is False:
-            eligible = False
-            reasons.append("FIR is mandatory for theft claims.")
-            recommendation = "NOT_ELIGIBLE"
-        elif hours_since is not None and hours_since > 72:
-            risk_flags.append("Theft reported >72 hours after incident — may require additional verification.")
-
-    if incident_type == "accident" and at_fault is True:
-        risk_flags.append("At-fault accident — claim may attract higher depreciation deduction.")
-
-    if damage_amount and policy and damage_amount > policy.insured_value * 0.5:
-        risk_flags.append(f"Estimated damage ({damage_amount}) exceeds 50% of IDV — surveyor visit mandatory.")
-
-    if not eligible:
-        recommendation = "NOT_ELIGIBLE"
-    elif risk_flags:
-        recommendation = "REVIEW_REQUIRED"
-    else:
-        recommendation = "ELIGIBLE"
-
-    return {
-        "eligible": eligible,
-        "status": recommendation,
-        "reasons": reasons,
-        "risk_flags": risk_flags,
-        "extracted_fields": {
-            "incident_type": incident_type,
-            "coverage_type": coverage_type,
-            "hours_since_incident": hours_since,
-            "at_fault": at_fault,
-            "third_party_involved": third_party,
-            "police_fir_filed": fir_filed,
-            "estimated_damage_amount": damage_amount,
-        },
-        "documents_required": [
-            "Policy copy",
-            "RC book",
-            "Driver license",
-            "Claim form",
-            "FIR copy (mandatory for theft/natural disaster)",
-            "Repair estimates",
-        ],
-        "ncb_impact": "A paid claim will reset NCB to 0% at next renewal. Protect your NCB by opting for NCB protection rider.",
-        "next_steps": "Submit all documents to the nearest cashless garage or our claims portal. Surveyor will assess damage within 24 hours for cashless, 48 hours for reimbursement claims.",
-    }

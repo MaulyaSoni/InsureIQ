@@ -353,86 +353,35 @@ def _feature_value_to_text(feature_name: str, value: Any) -> str:
     return str(value)
 
 
+def _format_shap_for_grok(features: list) -> str:
+    if not features:
+        return "No feature data available"
+    lines = []
+    for f in features[:5]:
+        name = f.get("plain_name", f.get("feature_name", "unknown"))
+        direction = "increases risk" if f.get("direction") == "increases_risk" else "reduces risk"
+        value = f.get("feature_value", "N/A")
+        lines.append(f"- {name}: value={value}, impact={direction}")
+    return "\n".join(lines) if lines else "No feature data available"
+
+
 @router.post("/risk-score-explainer")
 def module3_risk_explainer(payload: RiskExplainerRequest, _: User = Depends(get_current_user)):
-    claim_pct = payload.claim_probability * 100
-    sorted_features = sorted(
-        payload.shap_features,
-        key=lambda x: abs(float(x.get("shap_value", 0))),
-        reverse=True,
-    )[:5]
+    from backend.llm.groq_client import invoke_llm
+    from backend.llm.prompts import RISK_EXPLAINER_PROMPT
 
-    meaning = {
-        "LOW": "Your profile suggests a lower-than-average chance of claim compared to similar drivers.",
-        "MEDIUM": "Your profile suggests a moderate chance of claim compared to similar drivers in your city.",
-        "HIGH": "Your profile indicates elevated claim risk, but there are practical steps to reduce it.",
-        "CRITICAL": "Your profile currently indicates very high claim risk, but this can be improved with corrective actions.",
-    }[payload.risk_band]
+    shap_formatted = _format_shap_for_grok(payload.shap_features)
 
-    lines = [
-        "RISK PROFILE",
-        "────────────────────────────────",
-        f"Score: {payload.risk_score}/100  |  Band: {payload.risk_band}",
-        f"Claim Probability: {claim_pct:.1f}%",
-        "",
-        "WHAT THIS MEANS:",
-        meaning,
-        "",
-        "TOP RISK FACTORS:",
-    ]
+    prompt = RISK_EXPLAINER_PROMPT.format(
+        risk_score=payload.risk_score,
+        risk_band=payload.risk_band,
+        claim_probability_pct=round(payload.claim_probability * 100, 2),
+        shap_features_formatted=shap_formatted,
+    )
 
-    for i, feature in enumerate(sorted_features, start=1):
-        name = str(feature.get("feature") or feature.get("feature_name") or "factor")
-        impact_val = float(feature.get("shap_value", 0))
-        impact = "↑ raising" if impact_val >= 0 else "↓ reducing"
-        value_text = _feature_value_to_text(name, feature.get("feature_value"))
+    explanation = invoke_llm("reasoner", "", prompt)
+    return {"explanation": explanation}
 
-        if "claim" in name.lower():
-            why = "Past claim frequency is statistically linked with future claim likelihood."
-            action = "Drive claim-free for the next policy year to rebuild your profile."
-        elif "year" in name.lower() or "age" in name.lower():
-            why = "Older vehicles generally carry higher breakdown and repair risk over time."
-            action = "Keep service records updated and consider higher preventive maintenance frequency."
-        elif "engine" in name.lower() or "cc" in name.lower():
-            why = "Higher engine capacity can correlate with costlier and higher-severity losses."
-            action = "Use telematics-safe driving behavior to offset severity perception."
-        elif "use" in name.lower() or "commercial" in name.lower():
-            why = "Commercial driving usually increases road exposure and claim opportunity."
-            action = "Limit high-risk routes and ensure trained authorized drivers only."
-        else:
-            why = "This attribute materially shifts expected claim frequency or severity."
-            action = "Improve this attribute where possible before renewal to lower risk load."
-
-        lines.extend(
-            [
-                f"{i}. {_feature_title(name)} ({value_text})",
-                f"   Impact: {impact} your risk",
-                f"   Why: {why}",
-                f"   What you can do: {action}",
-            ]
-        )
-
-    lines.extend([
-        "",
-        "BOTTOM LINE:",
-    ])
-
-    if payload.risk_band == "CRITICAL":
-        lines.extend(
-            [
-                "You are currently in a high-risk underwriting zone, but this does not automatically mean denial.",
-                "Expect likely premium loading unless the top risk driver is improved before issuance/renewal.",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "Your risk position is improvable with focused corrective action on the top driver above.",
-                "The single biggest improvement is reducing the strongest upward risk factor before renewal.",
-            ]
-        )
-
-    return {"explanation": "\n".join(lines)}
 
 
 def _extract_topic(question: str) -> str:

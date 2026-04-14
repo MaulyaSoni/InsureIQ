@@ -9,46 +9,53 @@ from backend.llm.prompts import REPORT_WRITER_PROMPT, format_policy_summary
 
 
 def report_node(state: InsureIQState) -> InsureIQState:
-    db = state.get("_db")
-    policy_id = state.get("policy_id", "unknown")
-    model_name = "llama-3.3-70b-versatile"
-    cache_key = make_cache_key(policy_id, "underwriting_report", model_name)
+    try:
+        db = state.get("_db")
+        policy_id = state.get("policy_id", "unknown")
+        model_name = "llama-3.3-70b-versatile"
+        cache_key = make_cache_key(policy_id, "underwriting_report", model_name)
 
-    if db is not None:
-        cached = get_cached(cache_key, db)
-        if cached:
-            state["final_report"] = cached
-            state["report_id"] = f"cached-{policy_id[:8]}"
-            return state
+        if db is not None:
+            cached = get_cached(cache_key, db)
+            if cached:
+                state["final_report"] = cached
+                state["report_id"] = f"cached-{policy_id[:8]}"
+                return state
 
-    prompt = REPORT_WRITER_PROMPT.format(
-        policy_summary=format_policy_summary(state.get("policy_data", {})),
-        risk_score=state.get("risk_score"),
-        risk_band=state.get("risk_band"),
-        risk_explanation=state.get("risk_explanation") or "No explanation available.",
-        premium_narrative=state.get("premium_narrative") or "No premium advisory available.",
-        claim_probability_pct=round(float(state.get("claim_probability", 0.0)) * 100, 2),
-    )
-
-    res = invoke_with_retry("reasoner", [{"role": "user", "content": prompt}])
-    report_id = str(uuid.uuid4())
-    state["final_report"] = res
-    state["report_id"] = report_id
-
-    if db is not None and policy_id:
-        user_id = state.get("_user_id")
-        db.add(
-            Report(
-                id=report_id,
-                policy_id=policy_id,
-                user_id=user_id or "",
-                report_type=ReportType.underwriting,
-                content=res,
-                pdf_path=None,
-                created_at=datetime.utcnow(),
-            )
+        prompt = REPORT_WRITER_PROMPT.format(
+            policy_summary=format_policy_summary(state.get("policy_data", {})),
+            risk_score=state.get("risk_score"),
+            risk_band=state.get("risk_band"),
+            risk_explanation=state.get("risk_explanation") or "No explanation available.",
+            premium_narrative=state.get("premium_narrative") or "No premium advisory available.",
+            claim_probability_pct=round(float(state.get("claim_probability", 0.0)) * 100, 2),
         )
-        db.commit()
-        set_cached(cache_key, res, model_name, TTL_REPORT, db)
 
-    return state
+        res = invoke_with_retry("reasoner", [{"role": "user", "content": prompt}])
+        report_id = str(uuid.uuid4())
+        state["final_report"] = res
+        state["report_id"] = report_id
+
+        if db is not None and policy_id:
+            user_id = state.get("_user_id")
+            db.add(
+                Report(
+                    id=report_id,
+                    policy_id=policy_id,
+                    user_id=user_id or "",
+                    report_type=ReportType.underwriting,
+                    content=res,
+                    pdf_path=None,
+                    created_at=datetime.utcnow(),
+                )
+            )
+            db.commit()
+            set_cached(cache_key, res, model_name, TTL_REPORT, db)
+
+        return state
+    except Exception as e:
+        print(f"[report_node] Error: {e}")
+        state["error"] = f"report_node failed: {str(e)}"
+        state["final_report"] = None
+        state["report_id"] = None
+        return state

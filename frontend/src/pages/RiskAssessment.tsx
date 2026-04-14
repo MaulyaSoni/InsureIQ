@@ -12,7 +12,7 @@ import {
   ChevronDown,
   Loader2,
 } from "lucide-react";
-import { getPolicies, getPolicy, runAllAnalysis } from "@/lib/api";
+import { getPolicies, getPolicy, runAllAnalysis, explainRisk } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function RiskAssessment() {
@@ -24,6 +24,8 @@ export default function RiskAssessment() {
   const [policy, setPolicy] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [explaining, setExplaining] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
 
   // What-if simulator state
   const [simulatorState, setSimulatorState] = useState({
@@ -260,25 +262,67 @@ export default function RiskAssessment() {
               </div>
 
               {/* SHAP Chart */}
-              {policy.risk_factors && (
+                    {policy.risk_factors && policy.risk_factors.length > 0 && (
                 <div className="nu-card" style={{ padding: 24 }}>
                   <div className="kpi-label" style={{ fontSize: 10, marginBottom: 20 }}>Factor Impact Attribution (SHAP)</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {policy.risk_factors.map((f: any) => (
-                      <div key={f.feature} className="shap-bar-container">
-                        <div className="shap-label" style={{ width: 140 }}>{f.feature}</div>
-                        <div className="shap-bar-track">
-                          <div
-                            className={f.impact >= 0 ? "shap-bar-fill-pos" : "shap-bar-fill-neg"}
-                            style={{ width: `${Math.abs(f.impact) * 85}%` }}
-                          />
+                    {policy.risk_factors.map((f: any) => {
+                      const label = f.plain_name || f.feature_name || f.feature || "Unknown";
+                      const impact = f.shap_value ?? f.impact ?? 0;
+                      const isPositive = impact >= 0 || f.direction === "increases_risk";
+                      return (
+                        <div key={label} className="shap-bar-container">
+                          <div className="shap-label" style={{ width: 140 }}>{label}</div>
+                          <div className="shap-bar-track">
+                            <div
+                              className={isPositive ? "shap-bar-fill-pos" : "shap-bar-fill-neg"}
+                              style={{ width: `${Math.abs(impact) * 85}%` }}
+                            />
+                          </div>
+                          <div className="shap-value" style={{ color: isPositive ? "#0066FF" : "#FF3B5C" }}>
+                            {impact >= 0 ? "+" : ""}{impact.toFixed(2)}
+                          </div>
                         </div>
-                        <div className="shap-value" style={{ color: f.impact >= 0 ? "#0066FF" : "#FF3B5C" }}>
-                          {f.impact >= 0 ? "+" : ""}{f.impact.toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
+                  <button
+                    onClick={async () => {
+                      if (!policy.risk_prediction_id) {
+                        toast.error("No prediction ID available");
+                        return;
+                      }
+                      setExplaining(true);
+                      try {
+                        const result = await explainRisk(policy.risk_prediction_id);
+                        setExplanation(result.explanation);
+                        toast.success("Explanation generated");
+                      } catch (err: any) {
+                        toast.error(err.message || "Failed to generate explanation");
+                      } finally {
+                        setExplaining(false);
+                      }
+                    }}
+                    disabled={explaining || !policy.risk_prediction_id}
+                    style={{
+                      marginTop: 16,
+                      padding: "8px 16px",
+                      background: "#0066FF",
+                      color: "white",
+                      border: "none",
+                      borderRadius: 6,
+                      cursor: explaining ? "not-allowed" : "pointer",
+                      fontSize: 13,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {explaining ? "Generating..." : "Explain with AI"}
+                  </button>
+                  {explanation && (
+                    <div style={{ marginTop: 16, padding: 16, background: "#1a1f2e", borderRadius: 8, fontSize: 13, color: "#a0aec0", lineHeight: 1.6 }}>
+                      {explanation}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

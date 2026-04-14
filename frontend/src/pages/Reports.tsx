@@ -13,8 +13,15 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
-import { getPolicies, generateReport } from "@/lib/api";
+import { getPolicies, generateReport, request } from "@/lib/api";
 import { toast } from "sonner";
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("insureiq_token") || "";
+  return { "Authorization": `Bearer ${token}` };
+};
 
 export default function Reports() {
   const [policies, setPolicies] = useState<any[]>([]);
@@ -57,7 +64,7 @@ export default function Reports() {
       loading: "Initializing LangGraph report agent...",
       success: (data) => {
         setReports([{ 
-          id: data.id, 
+          id: data.id || data.report_id, 
           policyId: data.policy_id, 
           holder: "Rajesh Kumar", 
           type: "Full Analysis", 
@@ -72,6 +79,24 @@ export default function Reports() {
         return err.message || "Report generation failed";
       },
     });
+  };
+
+  const handleDownloadPDF = async (reportId: string, policyNumber: string) => {
+    try {
+      const res = await fetch(`${BASE_URL}/reports/${reportId}/pdf`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("PDF generation failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `InsureIQ_Report_${policyNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error("PDF download failed");
+    }
   };
 
   return (
@@ -161,7 +186,7 @@ export default function Reports() {
                       >
                         <Eye size={14} color="#8A95B0" />
                       </button>
-                      <button className="nu-btn-ghost" style={{ padding: 6, border: "none" }}>
+                      <button className="nu-btn-ghost" style={{ padding: 6, border: "none" }} onClick={() => handleDownloadPDF(rpt.id, rpt.policyId)}>
                         <Download size={14} color="#0066FF" />
                       </button>
                       <button className="nu-btn-ghost" style={{ padding: 6, border: "none" }}>
@@ -178,7 +203,7 @@ export default function Reports() {
 
       {/* Generate Report Modal Overlay */}
       {showModal && (
-        <div style={{ position: "fixed", inset: 0, zDelete: 300, display: "flex", alignItems: "center", justifyCenter: "center", backgroundColor: "rgba(7, 8, 13, 0.8)", backdropFilter: "blur(4px)" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(7, 8, 13, 0.8)", backdropFilter: "blur(4px)" }}>
           <div className="nu-card-elevated" style={{ width: 440, padding: 32, position: "relative", boxShadow: "0 20px 40px rgba(0,0,0,0.5)" }}>
             <button 
               onClick={() => setShowModal(false)}
@@ -231,7 +256,7 @@ export default function Reports() {
         className={`ai-drawer ${showPreview ? "open" : ""}`}
         style={{ width: 480 }}
       >
-        <div style={{ height: 60, display: "flex", alignItems: "center", justifyBetween: "space-between", padding: "0 24px", borderBottom: "1px solid #1E2535" }}>
+        <div style={{ height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid #1E2535" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <FileText size={18} color="#0066FF" />
             <div>

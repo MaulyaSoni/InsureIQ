@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api`;
 const VISHLESHAK_CONFIG_KEY = "insureiq_vishleshak_config";
 
 function getToken() {
@@ -107,6 +107,7 @@ export const runAllAnalysis = async (id: string) => {
   return {
     ...base,
     ...analysis,
+    risk_prediction_id: analysis.risk_prediction_id || null,
     risk_score: Number(risk.risk_score ?? base?.risk_score ?? 0),
     risk_band: String(risk.risk_band ?? base?.risk_band ?? "LOW"),
     claim_probability: Number(risk.claim_probability ?? base?.claim_probability ?? 0) * 100,
@@ -118,6 +119,16 @@ export const runAllAnalysis = async (id: string) => {
 // --- Risk Assessment ---
 export const assessRisk = (policyId: string) =>
   request("/risk/assess", { method: "POST", body: JSON.stringify({ policy_id: policyId }) });
+
+export const explainRisk = async (predictionId: string) => {
+  const res = await fetch(`${BASE_URL}/risk/explain`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ prediction_id: predictionId }),
+  });
+  if (!res.ok) throw new Error("Explanation failed");
+  return res.json();
+};
 
 // --- Claim Prediction ---
 export const predictClaim = async (policyId: string) => {

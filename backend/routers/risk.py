@@ -10,9 +10,12 @@ from sqlalchemy.orm import Session
 from backend.auth.dependencies import get_current_user
 from backend.database.db import get_db
 from backend.database.models import Policy, RiskBandEnum, RiskPrediction, User
+from backend.llm.groq_client import invoke_llm
+from backend.llm.prompts import RISK_EXPLAINER_PROMPT
 from backend.ml.fraud_detector import detect_fraud_signals
 from backend.ml.service import build_risk_assessment_out, evaluate_policy_ml
 from backend.schemas.analytics import RiskAssessmentOut
+from backend.schemas.risk import RiskExplainRequest, RiskExplainResponse
 
 
 class RiskAssessRequest(BaseModel):
@@ -153,3 +156,41 @@ def get_policy_prediction_history(
             for r in rows
         ],
     }
+
+
+@router.post("/explain", response_model=RiskExplainResponse)
+def explain_risk(
+    request: RiskExplainRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Generate a plain-language explanation for an existing risk prediction."""
+    prediction = db.query(RiskPrediction).filter(RiskPrediction.id == request.prediction_id).first()
+    if not prediction:
+        raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "detail": "Prediction not found"})
+    policy = db.query(Policy).filter(Policy.id == prediction.policy_id).first()
+    if not policy or policy.user_id != user.id:
+        raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "detail": "Prediction not found"})
+
+    shap_features = prediction.shap_features or []
+    shap_formatted = "\n".join([
+        f"- {f.get('plain_name', f.get('feature_name', 'Unknown'))}: "
+        f"{'increases' if f.get('direction') == 'increases_risk' else 'reduces'} "
+        f"risk (value: {f.get('feature_value')}, impact: {f.get('shap_value', 0):+.3f})"
+        for f in shap_features[:5]
+    ])
+
+    prompt = RISK_EXPLAINER_PROMPT.format(
+        risk_score=prediction.risk_score,
+        risk_band=prediction.risk_band.value,
+        claim_probability_pct=round(prediction.claim_probability * 100, 1),
+        shap_features_formatted=shap_formatted,
+    )
+    explanation = invoke_llm("reasoner", prompt)
+
+    return RiskExplainResponse(
+        prediction_id=prediction.id,
+        explanation=explanation,
+        model_used="llama-3.3-70b-versatile",
+        cached=False,
+    )

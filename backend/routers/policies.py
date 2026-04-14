@@ -419,6 +419,7 @@ def run_all_analysis(
 
     return {
         "policy_id": row.id,
+        "risk_prediction_id": risk_row.id,
         "risk": {
             "claim_probability": float(probability),
             "risk_score": risk_score,

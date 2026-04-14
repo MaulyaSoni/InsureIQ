@@ -12,6 +12,7 @@ from backend.schemas.policy import (
     PolicyResponse,
     PolicyUpdate,
 )
+from backend.schemas.premium import WhatIfRequest
 from backend.schemas.report import ReportGenerateRequest, ReportResponse
 from backend.schemas.risk import (
     RiskAssessRequest,
@@ -35,6 +36,7 @@ __all__ = [
     "PolicyListResponse",
     "PolicyResponse",
     "PolicyUpdate",
+    "WhatIfRequest",
     "ReportGenerateRequest",
     "ReportResponse",
     "RiskAssessRequest",

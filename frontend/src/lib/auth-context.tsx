@@ -38,9 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await loginApi(email, password);
     const authUser: AuthUser = {
-      id: String(res.user.id),
-      email: res.user.email,
-      name: res.user.name,
+      id: String(res.user?.id || res.user_id),
+      email: res.user?.email || res.email,
+      name: res.user?.name || res.full_name,
     };
     persistAuthToken(res.access_token);
     setUser(authUser);
@@ -50,9 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = async (email: string, password: string, name?: string) => {
     const res = await signupApi(email, password, name);
     const authUser: AuthUser = {
-      id: String(res.user.id),
-      email: res.user.email,
-      name: res.user.name,
+      id: String(res.user?.id || res.user_id),
+      email: res.user?.email || res.email,
+      name: res.user?.name || res.full_name,
     };
     persistAuthToken(res.access_token);
     setUser(authUser);
