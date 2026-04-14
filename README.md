@@ -168,4 +168,4 @@ InsureIQ operates in the Indian motor insurance market regulated by **IRDAI** (I
 
 ---
 
-*Built by Larry · Stack: FastAPI + XGBoost + LangGraph + Groq + React · Domain: Indian Motor Insurance*
+*Built by Maulya Soni · Stack: FastAPI + XGBoost + LangGraph + Groq + React · Domain: Indian Motor Insurance*
