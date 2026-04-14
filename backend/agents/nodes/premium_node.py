@@ -7,13 +7,29 @@ import re
 
 
 def _extract_inr_values(text: str) -> list[float]:
-    nums = re.findall(r"\b\d{2,7}(?:,\d{2,3})*(?:\.\d+)?\b", text.replace("â‚¹", ""))
+    # Look for explicit min/max range formats first
+    ranges = re.findall(r"([\d,]{4,})\s*(?:to|-|–|—|and)\s*(?:Rs\.?|INR|₹|â‚¹)?\s*([\d,]{4,})", text)
+    if ranges:
+        for r_min, r_max in ranges:
+            try:
+                mn = float(r_min.replace(",", ""))
+                mx = float(r_max.replace(",", ""))
+                if 1000 <= mn <= mx:
+                    return [mn, mx]
+            except Exception:
+                continue
+
+    # Fallback: extract all large numbers (likely INR values, ignoring percentages and UI/score metrics)
+    nums = re.findall(r"\b(\d{1,7}(?:,\d{2,3})*(?:\.\d+)?)\b", text.replace("₹", "").replace("Rs", "").replace("â‚¹", ""))
     out: list[float] = []
     for n in nums:
         try:
-            out.append(float(n.replace(",", "")))
+            val = float(n.replace(",", ""))
+            if val >= 1000:
+                out.append(val)
         except Exception:
             continue
+    out.sort()
     return out
 
 

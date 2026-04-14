@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
@@ -72,28 +73,37 @@ def premium_advise(
     base_premium = float(policy.premium_amount or 15000)
     try:
         out = insureiq_graph.invoke(state)
+        rec_premium = out.get("premium_max") or round(base_premium * 1.1, 2)
         return {
+            "id": f"pa-{policy.id}-{int(datetime.utcnow().timestamp())}",
             "policy_id": policy.id,
+            "current_premium": base_premium,
+            "recommended_premium": rec_premium,
             "risk_score": out.get("risk_score"),
             "risk_band": out.get("risk_band"),
             "claim_probability": out.get("claim_probability"),
             "premium_range": {
                 "min": out.get("premium_min") or round(base_premium * 0.9, 2),
-                "max": out.get("premium_max") or round(base_premium * 1.25, 2),
+                "max": out.get("premium_max") or rec_premium,
             },
             "premium_narrative": out.get("premium_narrative"),
             "justification": out.get("premium_narrative") or "AI pricing node executed successfully.",
             "adjustment_factors": out.get("adjustment_factors", []),
+            "created_at": datetime.utcnow().isoformat(),
         }
     except Exception:
         return {
+            "id": f"pa-{policy.id}-fallback-{int(datetime.utcnow().timestamp())}",
             "policy_id": policy.id,
+            "current_premium": base_premium,
+            "recommended_premium": round(base_premium * 1.1, 2),
             "premium_range": {
                 "min": round(base_premium * 0.9, 2),
                 "max": round(base_premium * 1.25, 2),
             },
             "justification": "[Graph Fallback] Logic node offline.",
             "adjustment_factors": [],
+            "created_at": datetime.utcnow().isoformat(),
         }
 
 

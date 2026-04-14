@@ -26,7 +26,15 @@ export default function ClaimPrediction() {
   const [policy, setPolicy] = useState<any>(null);
   const [prediction, setPrediction] = useState<any>(null);
   const [eligibility, setEligibility] = useState<any>(null);
-  const [incidentData, setIncidentData] = useState<any>({});
+  const [incidentData, setIncidentData] = useState<any>({
+    incident_type: "",
+    date_of_incident: new Date().toISOString().split('T')[0],
+    at_fault: false,
+    fir_filed: true,
+    third_party_involved: false,
+    hours_since_incident: 24,
+    damage_estimate_inr: 0,
+  });
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -67,9 +75,6 @@ export default function ClaimPrediction() {
         const eligResult = await checkClaimEligibility({
           policy_id: selectedPolicyId,
           ...incidentData,
-          third_party_involved: false,
-          hours_since_incident: 24,
-          damage_estimate_inr: 0,
         });
         setEligibility(eligResult);
       }
@@ -105,7 +110,7 @@ export default function ClaimPrediction() {
               <option value="">Choose a policy record...</option>
               {policies.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.policy_number} — {p.holder_name}
+                  {p.policy_number} — {p.policyholder_name}
                 </option>
               ))}
             </select>

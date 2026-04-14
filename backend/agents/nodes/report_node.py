@@ -18,8 +18,22 @@ def report_node(state: InsureIQState) -> InsureIQState:
         if db is not None:
             cached = get_cached(cache_key, db)
             if cached:
+                report_id = str(uuid.uuid4())
                 state["final_report"] = cached
-                state["report_id"] = f"cached-{policy_id[:8]}"
+                state["report_id"] = report_id
+                user_id = state.get("_user_id")
+                db.add(
+                    Report(
+                        id=report_id,
+                        policy_id=policy_id,
+                        user_id=user_id or "",
+                        report_type=ReportType.underwriting,
+                        content=cached,
+                        pdf_path=None,
+                        created_at=datetime.utcnow(),
+                    )
+                )
+                db.commit()
                 return state
 
         prompt = REPORT_WRITER_PROMPT.format(

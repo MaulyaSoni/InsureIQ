@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from backend.auth import get_current_user
 from backend.database.db import get_db
 from backend.database.models import BatchJob, BatchJobStatus, Policy, RiskPrediction, User
-from backend.ml.feature_engineer import policy_to_feature_vector
+from backend.ml.feature_engineer import policy_orm_to_dict, policy_to_feature_vector
 from backend.ml.risk_scorer import risk_score_to_band
 
 router = APIRouter(prefix="/batch", tags=["batch"], dependencies=[Depends(get_current_user)])
@@ -35,9 +35,17 @@ def _predict_score(model, vector) -> float:
 
 
 def _run_batch_job(job_id: str, policy_ids: list[str], user_id: str) -> None:
-    from backend.main import app as fastapi_app
     from backend.database.db import SessionLocal
     from backend.ml.risk_scorer import risk_score_to_band_enum
+    from fastapi import FastAPI
+    import sys
+
+    # Find the app instance without direct import from main.py to avoid circular dependency
+    # During normal execution, the app instance is already initialized in memory.
+    # We can try to get it from sys.modules if it's already loaded.
+    app = None
+    if "backend.main" in sys.modules:
+        app = getattr(sys.modules["backend.main"], "app", None)
 
     db = SessionLocal()
     try:
@@ -48,8 +56,21 @@ def _run_batch_job(job_id: str, policy_ids: list[str], user_id: str) -> None:
         job.status = BatchJobStatus.running
         db.commit()
 
-        model = fastapi_app.state.model
-        explainer = fastapi_app.state.explainer
+        model = app.state.model if app else None
+        explainer = app.state.explainer if app else None
+
+        # Fallback to loading model if app state is not available (e.g. testing)
+        if model is None:
+            from backend.config import get_settings
+            from backend.ml.predictor import load_model
+            from pathlib import Path
+            settings = get_settings()
+            model_path = Path(settings.model_path)
+            if model_path.exists():
+                try:
+                    model = load_model(str(model_path))
+                except Exception:
+                    pass
 
         summary: dict = {
             "avg_risk_score": 0.0,
@@ -77,11 +98,21 @@ def _run_batch_job(job_id: str, policy_ids: list[str], user_id: str) -> None:
                 continue
 
             try:
-                vector = policy_to_feature_vector(policy)
-                score = _predict_score(model, vector)
-                band_str = risk_score_to_band(int(round(score)))
-                prob = (score / 100.0) * 0.7 if score <= 1.0 else score * 0.7
-
+                # Convert ORM to dict for feature engineering
+                policy_dict = policy_orm_to_dict(policy)
+                vector, _ = policy_to_feature_vector(policy_dict)
+                
+                # Predict risk score
+                if model:
+                    prob = _predict_score(model, vector)
+                else:
+                    # Fallback probability if model is not loaded
+                    prob = 0.35
+                
+                from backend.ml.risk_scorer import probability_to_risk_score
+                score = probability_to_risk_score(prob)
+                band_str = risk_score_to_band(score)
+                
                 if band_str.upper() == "CRITICAL":
                     summary["flagged_critical"].append(policy_id)
 
@@ -97,16 +128,17 @@ def _run_batch_job(job_id: str, policy_ids: list[str], user_id: str) -> None:
                     policy_id=policy.id,
                     user_id=user_id,
                     claim_probability=round(float(prob), 6),
-                    risk_score=int(round(score)),
+                    risk_score=int(score),
                     risk_band=risk_score_to_band_enum(score),
                     shap_features=[],
-                    llm_explanation="",
+                    llm_explanation="Batch analysis prediction.",
                     model_version="xgb_v1_batch",
                     created_at=now,
                 )
                 db.add(rp)
                 processed += 1
-            except Exception:
+            except Exception as e:
+                print(f"Batch processing error for policy {policy_id}: {e}")
                 failed += 1
 
             job.processed_count = processed

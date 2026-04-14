@@ -116,6 +116,19 @@ class Policy(Base):
     user: Mapped["User"] = relationship(back_populates="policies")
     risk_predictions: Mapped[list["RiskPrediction"]] = relationship(back_populates="policy")
 
+    @property
+    def latest_risk_prediction(self):
+        if not self.risk_predictions:
+            return None
+        pred = max(self.risk_predictions, key=lambda x: x.created_at)
+        return {
+            "id": pred.id,
+            "claim_probability": pred.claim_probability,
+            "risk_score": pred.risk_score,
+            "risk_band": pred.risk_band,
+            "created_at": pred.created_at,
+        }
+
 
 class RiskPrediction(Base):
     __tablename__ = "risk_predictions"

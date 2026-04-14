@@ -318,7 +318,7 @@ def get_audit_log(
     logs = (
         db.query(AuditLog)
         .filter(AuditLog.user_id == user.id)
-        .order_by(AuditLog.timestamp.desc())
+        .order_by(AuditLog.created_at.desc())
         .limit(limit)
         .all()
     )
@@ -330,7 +330,7 @@ def get_audit_log(
             "entity_type": log.resource_type,
             "entity_id": log.resource_id,
             "details": log.payload_hash,
-            "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+            "timestamp": log.created_at.isoformat() if log.created_at else None,
         }
         for log in logs
     ]

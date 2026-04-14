@@ -30,41 +30,41 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AuthProvider>
         <BrowserRouter
           future={{
             v7_startTransition: true,
             v7_relativeSplatPath: true,
           }}
         >
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="*" element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/policies" element={<Policies />} />
-                    <Route path="/policies/:id" element={<PolicyDetails />} />
-                    <Route path="/risk-assessment" element={<RiskAssessment />} />
-                    <Route path="/claim-prediction" element={<ClaimPrediction />} />
-                    <Route path="/premium-advisory" element={<PremiumAdvisory />} />
-                    <Route path="/reports" element={<Reports />} />
-                    <Route path="/batch-analysis" element={<BatchAnalysis />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/workbench" element={<Workbench />} />
-                    <Route path="/fraud-review" element={<FraudReview />} />
-                    <Route path="/audit-log" element={<AuditLog />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </AppLayout>
-              </ProtectedRoute>
-            } />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="*" element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/policies" element={<Policies />} />
+                      <Route path="/policies/:id" element={<PolicyDetails />} />
+                      <Route path="/risk-assessment" element={<RiskAssessment />} />
+                      <Route path="/claim-prediction" element={<ClaimPrediction />} />
+                      <Route path="/premium-advisory" element={<PremiumAdvisory />} />
+                      <Route path="/reports" element={<Reports />} />
+                      <Route path="/batch-analysis" element={<BatchAnalysis />} />
+                      <Route path="/analytics" element={<Analytics />} />
+                      <Route path="/workbench" element={<Workbench />} />
+                      <Route path="/fraud-review" element={<FraudReview />} />
+                      <Route path="/audit-log" element={<AuditLog />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </AppLayout>
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
-      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

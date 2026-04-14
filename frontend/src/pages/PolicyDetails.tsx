@@ -103,7 +103,7 @@ export default function PolicyDetails() {
               <h1 className="nu-page-title" style={{ fontSize: 24 }}>Policy #{policy.policy_number || `IQ-00${String(policy.id).slice(-3)}`}</h1>
               <RiskBadge band={policy.risk_band || "LOW"} />
             </div>
-            <div className="nu-page-subtitle">Holder: {policy.holder_name} · Vehicle: {policy.vehicle_make} {policy.vehicle_model}</div>
+            <div className="nu-page-subtitle">Holder: {policy.policyholder_name} · Vehicle: {policy.vehicle_make} {policy.vehicle_model}</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -192,7 +192,7 @@ export default function PolicyDetails() {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
                       <div>
                         <div style={{ fontSize: 11, color: "#485068", textTransform: "uppercase" }}>City</div>
-                        <div className="nu-mono-value" style={{ fontSize: 13 }}>{policy.registration_city || "Mumbai"}</div>
+                        <div className="nu-mono-value" style={{ fontSize: 13 }}>{policy.city || "Mumbai"}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: 11, color: "#485068", textTransform: "uppercase" }}>RTO Code</div>

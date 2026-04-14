@@ -130,6 +130,12 @@ async def import_csv(
             errors.append({"row": row_index, "field": "policy_number", "error": "Duplicate policy_number"})
             continue
         now = datetime.utcnow()
+        start_date = payload.policy_start_date or now.date()
+        duration_months = payload.policy_duration_months or 12
+        
+        from dateutil.relativedelta import relativedelta
+        end_date = start_date + relativedelta(months=duration_months)
+        
         p = Policy(
             user_id=user.id,
             policy_number=payload.policy_number.strip(),
@@ -149,8 +155,9 @@ async def import_csv(
             city=payload.city,
             annual_mileage_km=payload.annual_mileage_km or 12_000,
             ncb_percentage=float(payload.ncb_percentage),
-            policy_start_date=payload.policy_start_date or datetime.utcnow().date(),
-            policy_duration_months=payload.policy_duration_months or 12,
+            policy_start_date=start_date,
+            policy_end_date=end_date,
+            policy_duration_months=duration_months,
             is_active=True,
             created_at=now,
             updated_at=now,
@@ -184,7 +191,15 @@ def list_policies(
 def create_policy(payload: PolicyCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if db.query(Policy).filter(Policy.policy_number == payload.policy_number).first():
         error_response(status.HTTP_400_BAD_REQUEST, "POLICY_ALREADY_EXISTS", "Policy number already exists", "policy_number")
+    
     now = datetime.utcnow()
+    start_date = payload.policy_start_date or now.date()
+    duration_months = payload.policy_duration_months or 12
+    
+    # Calculate end date
+    from dateutil.relativedelta import relativedelta
+    end_date = start_date + relativedelta(months=duration_months)
+    
     row = Policy(
         user_id=user.id,
         policy_number=payload.policy_number.strip(),
@@ -204,8 +219,9 @@ def create_policy(payload: PolicyCreate, db: Session = Depends(get_db), user: Us
         city=payload.city,
         annual_mileage_km=payload.annual_mileage_km or 12_000,
         ncb_percentage=float(payload.ncb_percentage),
-        policy_start_date=payload.policy_start_date or now.date(),
-        policy_duration_months=payload.policy_duration_months or 12,
+        policy_start_date=start_date,
+        policy_end_date=end_date,
+        policy_duration_months=duration_months,
         is_active=True,
         created_at=now,
         updated_at=now,

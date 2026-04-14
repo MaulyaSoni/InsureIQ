@@ -67,6 +67,22 @@ def dashboard_kpis(db: Session = Depends(get_db), user: User = Depends(get_curre
             Policy.created_at >= datetime.utcnow() - timedelta(days=7),
         ).scalar() or 0
 
+        # Fix: Calculate total insured value and premium
+        total_insured_value = db.query(func.sum(Policy.insured_value)).filter(
+            Policy.user_id == user.id,
+            Policy.is_active.is_(True),
+        ).scalar() or 0.0
+
+        total_premium = db.query(func.sum(Policy.premium_amount)).filter(
+            Policy.user_id == user.id,
+            Policy.is_active.is_(True),
+        ).scalar() or 0.0
+
+        # Fix: Calculate reports generated
+        total_reports = db.query(func.count(Report.id)).filter(
+            Report.user_id == user.id
+        ).scalar() or 0
+
         return {
             "total_policies": total_policies,
             "total_assessed": total_assessed,
@@ -78,8 +94,9 @@ def dashboard_kpis(db: Session = Depends(get_db), user: User = Depends(get_curre
             "total_predictions_today": predictions_today,
             "claims_predicted_this_month": reports_this_month,
             "policies_added_this_week": policies_this_week,
-            "total_insured_value": 0.0,
-            "total_premium": 0.0,
+            "total_insured_value": float(total_insured_value),
+            "total_premium": float(total_premium),
+            "reports_generated": total_reports,
         }
     except Exception:
         return {
@@ -95,6 +112,7 @@ def dashboard_kpis(db: Session = Depends(get_db), user: User = Depends(get_curre
             "policies_added_this_week": 0,
             "total_insured_value": 0.0,
             "total_premium": 0.0,
+            "reports_generated": 0,
         }
 
 

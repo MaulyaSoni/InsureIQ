@@ -5,6 +5,11 @@ function getToken() {
   return localStorage.getItem("insureiq_token") || "";
 }
 
+export function getAuthHeaders() {
+  const token = getToken();
+  return token ? { "Authorization": `Bearer ${token}` } : {};
+}
+
 export function persistAuthToken(token: string) {
   localStorage.setItem("insureiq_token", token);
 }
@@ -76,7 +81,7 @@ export const signupApi = (email: string, password: string, name?: string) =>
 export const getPolicies = async (page = 1, limit = 20) => {
   const res = await request(`/policies?page=${page}&limit=${limit}`);
   if (Array.isArray(res)) return res;
-  if (res && Array.isArray(res.items)) return res.items;
+  if (res && Array.isArray(res.policies)) return res.policies;
   return [];
 };
 
@@ -241,9 +246,11 @@ export const generateReport = async (policyId: string) => {
   };
 };
 
+export const getReports = () => request("/reports", { method: "GET" });
+
 export const downloadReportPDF = (reportId: string) => {
   const token = getToken();
-  return fetch(`${API_BASE}/reports/${reportId}/pdf`, {
+  return fetch(`${BASE_URL}/reports/${reportId}/pdf`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 };

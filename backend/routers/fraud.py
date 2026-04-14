@@ -100,8 +100,14 @@ def get_flagged_policies(
         signals = pred.fraud_signals or []
         if severity and severity.upper() not in [s.get("severity", "").upper() for s in signals]:
             continue
+        
+        # Get policy details
+        policy = db.query(Policy).filter(Policy.id == pred.policy_id).first()
+        
         results.append({
             "policy_id": pred.policy_id,
+            "policy_number": policy.policy_number if policy else "Unknown",
+            "policyholder_name": policy.policyholder_name if policy else "Unknown",
             "risk_prediction_id": pred.id,
             "risk_score": pred.risk_score,
             "risk_band": pred.risk_band.value if pred.risk_band else None,

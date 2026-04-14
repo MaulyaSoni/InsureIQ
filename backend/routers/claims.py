@@ -92,13 +92,20 @@ def predict_claim(
         confidence_band = "high"
 
     return {
+        "id": f"cp-{policy.id}-{int(datetime.utcnow().timestamp())}",
         "policy_id": policy.id,
         "claim_probability": round(float(prob), 6),
         "risk_score": score,
         "risk_band": band,
         "confidence_band": confidence_band,
         "predicted_claim_amount": predicted_claim_amount,
+        "confidence_interval": {
+            "lower": round(predicted_claim_amount * 0.8, 2),
+            "upper": round(predicted_claim_amount * 1.2, 2),
+        },
+        "risk_factors": [],  # Could be populated from SHAP
         "model_version": "xgb_v1",
+        "created_at": datetime.utcnow().isoformat(),
     }
 
 

@@ -45,10 +45,10 @@ export default function RenewalTab() {
               <tbody className="divide-y divide-[#1E2535] text-sm text-[#F0F4FF]">
                 {isLoading ? (
                   <tr><td colSpan={4} className="p-4 text-center text-[#8A95B0]">Fetching upcoming...</td></tr>
-                ) : upcoming?.length === 0 ? (
+                ) : !Array.isArray(upcoming) || upcoming.length === 0 ? (
                   <tr><td colSpan={4} className="p-4 text-center text-[#8A95B0]">No policies expiring in 60 days.</td></tr>
                 ) : (
-                  upcoming?.map((item: any) => (
+                  upcoming.map((item: any) => (
                     <tr 
                       key={item.id}
                       className={`hover:bg-[#0B0D14] cursor-pointer ${selectedId === item.id ? 'bg-[#00D4FF]/10' : ''}`}

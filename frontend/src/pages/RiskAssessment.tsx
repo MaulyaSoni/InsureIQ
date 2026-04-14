@@ -105,10 +105,10 @@ export default function RiskAssessment() {
               >
                 <option value="">Choose a policy record...</option>
                 {policies.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.policy_number} — {p.holder_name}
-                  </option>
-                ))}
+                <option key={p.id} value={p.id}>
+                  {p.policy_number} — {p.policyholder_name}
+                </option>
+              ))}
               </select>
             </div>
           </div>

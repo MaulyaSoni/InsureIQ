@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { getPolicies, getPolicy, advisePremium, generateReport, submitBatchAnalysis } from "@/lib/api";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function PremiumAdvisory() {
   const [searchParams] = useSearchParams();
@@ -131,7 +133,7 @@ export default function PremiumAdvisory() {
               <option value="">Choose a policy record...</option>
               {policies.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.policy_number} — {p.holder_name}
+                  {p.policy_number} — {p.policyholder_name}
                 </option>
               ))}
             </select>
@@ -233,8 +235,16 @@ export default function PremiumAdvisory() {
                   <ShieldCheck size={14} color="#00D4FF" />
                   <span className="font-mono-ibm" style={{ fontSize: 14, fontWeight: 600 }}>Underwriting Advisory</span>
                 </div>
-                <div className="font-dm-sans" style={{ fontSize: 13, color: "#8A95B0", lineHeight: 1.6 }}>
-                  {advisory.justification || "No rationale provided by the pricing engine."} This recommendation accounts for local accident density trends and current portfolio volatility. <span style={{ color: "#F0F4FF" }}>Add NCB protect for ₹1,240</span> to safeguard the 20% discount against secondary liability claims.
+                <div className="font-dm-sans prose prose-invert prose-sm" style={{ fontSize: 13, color: "#8A95B0", lineHeight: 1.6, maxWidth: "none" }}>
+                  {advisory.justification ? (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {advisory.justification}
+                    </ReactMarkdown>
+                  ) : "No rationale provided by the pricing engine."}
+                  
+                  <div style={{ marginTop: 12 }}>
+                    This recommendation accounts for local accident density trends and current portfolio volatility. <span style={{ color: "#F0F4FF" }}>Add NCB protect for ₹1,240</span> to safeguard the 20% discount against secondary liability claims.
+                  </div>
                 </div>
                 <div className="nu-divider" style={{ margin: "20px 0" }} />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

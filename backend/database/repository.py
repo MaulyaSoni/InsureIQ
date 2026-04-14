@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import and_, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from backend.database.models import (
     AuditLog,
@@ -73,7 +73,7 @@ class PolicyRepository:
         risk_band: str | None = None,
         is_active: bool = True,
     ) -> list[Policy]:
-        query = db.query(Policy).filter(Policy.user_id == user_id, Policy.is_active == is_active)
+        query = db.query(Policy).filter(Policy.user_id == user_id, Policy.is_active == is_active).options(selectinload(Policy.risk_predictions))
 
         if risk_band:
             # Subquery to get latest risk prediction for each policy

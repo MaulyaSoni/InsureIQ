@@ -12,10 +12,14 @@ os.environ["DATABASE_URL"] = _db_url
 from backend.auth.password import hash_password
 from backend.database.db import SessionLocal, init_db
 from backend.database.models import (
+    AuditLog,
+    AuditStatus,
+    FraudReview,
     ParkingType,
     Policy,
     Report,
     ReportType,
+    ReviewQueue,
     RiskBandEnum,
     RiskPrediction,
     User,
@@ -340,9 +344,9 @@ def seed_db():
     else:
         existing_count = db.query(Policy).filter(Policy.user_id == user.id, Policy.is_active.is_(True)).count()
         if existing_count > 0:
-            print(f"Database already has {existing_count} active policies for demo user. Skipping seed.")
-            db.close()
-            return
+            print(f"Database already has {existing_count} active policies for demo user. Checking other tables...")
+            # Continue to seed other tables if needed, or just return
+            # For now, let's ensure other tables are seeded too
         print(f"Using existing user: {user.email}")
 
     print("Generating 300 realistic Indian vehicle insurance policies...")
@@ -461,6 +465,58 @@ def seed_db():
         db.add(policy)
         db.add(prediction)
 
+        # Seed ReviewQueue for High/Critical risk
+        if band in (RiskBandEnum.HIGH, RiskBandEnum.CRITICAL):
+            queue_item = ReviewQueue(
+                id=str(uuid.uuid4()),
+                policy_id=policy.id,
+                risk_prediction_id=prediction.id,
+                status="PENDING",
+                priority="URGENT" if band == RiskBandEnum.CRITICAL else "NORMAL",
+                assigned_to=user.id if random.random() > 0.5 else None,
+                due_by=datetime.utcnow() + timedelta(days=random.randint(1, 7)),
+                created_at=prediction.created_at,
+            )
+            db.add(queue_item)
+
+        # Seed FraudReview for some flagged policies
+        if prediction.fraud_flagged and random.random() > 0.7:
+            fraud_review = FraudReview(
+                id=str(uuid.uuid4()),
+                risk_prediction_id=prediction.id,
+                policy_id=policy.id,
+                user_id=user.id,
+                resolution=random.choice(["CONFIRMED_FRAUD", "FALSE_POSITIVE"]),
+                notes="Seeded fraud review for testing.",
+                reviewed_at=datetime.utcnow() - timedelta(days=random.randint(0, 30)),
+            )
+            db.add(fraud_review)
+
+        # Seed AuditLog
+        audit = AuditLog(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            action="CREATE_POLICY",
+            resource_type="policy",
+            resource_id=policy.id,
+            status=AuditStatus.success,
+            payload_hash=f"policy_number: {policy.policy_number}",
+            created_at=policy.created_at,
+        )
+        db.add(audit)
+
+        # Seed some Reports
+        if (i + 1) % 10 == 0:
+            report = Report(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                policy_id=policy.id,
+                report_type=random.choice(list(ReportType)),
+                content=f"Detailed analysis report for policy {policy.policy_number}. Assessed risk: {band.value}.",
+                created_at=datetime.utcnow() - timedelta(days=random.randint(0, 30)),
+            )
+            db.add(report)
+
         if (i + 1) % batch_size == 0:
             db.commit()
             print(f"  Inserted {i + 1}/300 policies...")
@@ -472,7 +528,7 @@ def seed_db():
     print("=" * 50)
     print("Seed complete! 300 policies created:")
     print()
-    print("  Login:  demo@insureiq.local")
+    print("  Login:  demo@insureiq.com")
     print("  Pass:   demo1234")
     print()
     print("  Risk band distribution (approximate):")

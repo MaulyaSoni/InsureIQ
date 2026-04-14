@@ -541,7 +541,7 @@ export default function Dashboard() {
                       {p.policy_number || `IQ-${String(p.id).slice(-5)}`}
                     </span>
                   </td>
-                  <td style={{ color: "#F0F4FF", fontSize: 13 }}>{p.holder_name || "—"}</td>
+                  <td style={{ color: "#F0F4FF", fontSize: 13 }}>{p.policyholder_name || "—"}</td>
                   <td style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, color: "#8A95B0" }}>
                     {p.vehicle_make || "—"} {p.vehicle_model || ""}
                   </td>

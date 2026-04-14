@@ -1,6 +1,7 @@
-﻿from io import BytesIO
+from datetime import datetime
+from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -60,14 +61,35 @@ def generate_report(
     }
     out = insureiq_graph.invoke(state)
     return {
+        "id": out.get("report_id") or f"rpt-{policy.id}-{int(datetime.utcnow().timestamp())}",
         "report_id": out.get("report_id"),
         "policy_id": policy.id,
         "risk_score": out.get("risk_score"),
         "risk_band": out.get("risk_band"),
+        "claim_probability": out.get("claim_probability") or 0.0,
+        "current_premium": float(policy.premium_amount or 0),
         "premium_min": out.get("premium_min"),
         "premium_max": out.get("premium_max"),
-        "content": out.get("final_report"),
+        "content": out.get("final_report") or "Analysis complete.",
+        "generated_at": datetime.utcnow().isoformat(),
     }
+
+
+@router.get("")
+def list_reports(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    reports = db.query(Report).filter(Report.user_id == user.id).order_by(Report.created_at.desc()).all()
+    out = []
+    for r in reports:
+        policy = db.query(Policy).filter(Policy.id == r.policy_id).first()
+        out.append({
+            "id": r.id,
+            "policyId": r.policy_id,
+            "holder": policy.policyholder_name if policy else "Unknown",
+            "type": r.report_type.value if hasattr(r.report_type, 'value') else str(r.report_type),
+            "date": r.created_at.isoformat() if r.created_at else "",
+            "status": "COMPLETE"
+        })
+    return out
 
 
 @router.get("/{report_id}/pdf")
@@ -81,32 +103,59 @@ def report_pdf(report_id: str, db: Session = Depends(get_db), user: User = Depen
             detail={"error": "SERVER_ERROR", "detail": "reportlab is required for PDF generation"},
         ) from exc
 
-    report = db.query(Report).filter(Report.id == report_id, Report.user_id == user.id).first()
-    if not report:
-        raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "detail": "Report not found"})
+    try:
+        report = db.query(Report).filter(Report.id == report_id, Report.user_id == user.id).first()
+        if not report:
+            raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "detail": "Report not found"})
 
-    packet = BytesIO()
-    c = canvas.Canvas(packet, pagesize=A4)
-    width, height = A4
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(40, height - 40, "InsureIQ Underwriting Report")
-    c.setFont("Helvetica", 10)
+        packet = BytesIO()
+        c = canvas.Canvas(packet, pagesize=A4)
+        width, height = A4
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(40, height - 40, "InsureIQ Underwriting Report")
+        c.setFont("Helvetica", 10)
 
-    y = height - 70
-    for line in (report.content or "").splitlines():
-        if y < 50:
-            c.showPage()
-            c.setFont("Helvetica", 10)
-            y = height - 40
-        c.drawString(40, y, line[:120])
-        y -= 14
+        y = height - 70
+        content_lines = (report.content or "").splitlines()
+        
+        import textwrap
+        for line in content_lines:
+            wrapped_lines = textwrap.wrap(line, width=100)
+            if not wrapped_lines:
+                y -= 14
+                continue
+                
+            for wrapped in wrapped_lines:
+                if y < 50:
+                    c.showPage()
+                    c.setFont("Helvetica", 10)
+                    y = height - 40
+                
+                # Sanitize line to remove or replace non-Latin1 characters
+                safe_line = wrapped.encode('latin-1', 'replace').decode('latin-1')
+                c.drawString(40, y, safe_line)
+                y -= 14
 
-    c.save()
-    packet.seek(0)
-    filename = f"insureiq-report-{report_id}.pdf"
-    return StreamingResponse(
-        packet,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+        c.save()
+        packet.seek(0)
+        filename = f"insureiq-report-{report_id}.pdf"
+        
+        return Response(
+            content=packet.getvalue(),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"PDF Generation Error: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "PDF_GENERATION_FAILED", "detail": str(e)}
+        )
 

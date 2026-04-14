@@ -13,7 +13,7 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
-import { getPolicies, generateReport, request } from "@/lib/api";
+import { getPolicies, getReports, generateReport, downloadReportPDF, request } from "@/lib/api";
 import { toast } from "sonner";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -25,15 +25,9 @@ const getAuthHeaders = () => {
 
 export default function Reports() {
   const [policies, setPolicies] = useState<any[]>([]);
-  const [reports, setReports] = useState<any[]>([
-    { id: "RPT-0834", policyId: "IQ-00247", holder: "Rajesh Kumar", type: "Full Analysis", date: "2 min ago", status: "COMPLETE" },
-    { id: "RPT-0835", policyId: "IQ-00248", holder: "Priya Sharma", type: "Risk Only", date: "5 min ago", status: "COMPLETE" },
-    { id: "RPT-0836", policyId: "IQ-00249", holder: "Amit Patel", type: "Full Analysis", date: "generating...", status: "GENERATING" },
-    { id: "RPT-0837", policyId: "IQ-00250", holder: "Sunita Rao", type: "Premium", date: "1 hr ago", status: "COMPLETE" },
-    { id: "RPT-0838", policyId: "IQ-00251", holder: "Vikram Singh", type: "Full Analysis", date: "3 hrs ago", status: "FAILED" },
-  ]);
+  const [reports, setReports] = useState<any[]>([]);
   
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -43,15 +37,22 @@ export default function Reports() {
   const [reportType, setReportType] = useState("full");
 
   useEffect(() => {
-    fetchPolicies();
+    fetchData();
   }, []);
 
-  const fetchPolicies = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const data = await getPolicies();
-      setPolicies(data);
+      const [policiesData, reportsData] = await Promise.all([
+        getPolicies(),
+        getReports().catch(() => [])
+      ]);
+      setPolicies(policiesData);
+      setReports(reportsData);
     } catch {
-      toast.error("Failed to load policy list");
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,23 +82,23 @@ export default function Reports() {
     });
   };
 
-  const handleDownloadPDF = async (reportId: string, policyNumber: string) => {
-    try {
-      const res = await fetch(`${BASE_URL}/reports/${reportId}/pdf`, {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error("PDF generation failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `InsureIQ_Report_${policyNumber}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      toast.error("PDF download failed");
-    }
-  };
+   const handleDownloadPDF = async (reportId: string, policyNumber: string) => {
+     try {
+       const res = await downloadReportPDF(reportId);
+       if (!res.ok) throw new Error("PDF generation failed");
+       const blob = await res.blob();
+       const url = URL.createObjectURL(blob);
+       const a = document.createElement("a");
+       a.href = url;
+       a.download = `InsureIQ_Report_${policyNumber}.pdf`;
+       document.body.appendChild(a);
+       a.click();
+       document.body.removeChild(a);
+       URL.revokeObjectURL(url);
+     } catch (err) {
+       toast.error("PDF download failed");
+     }
+   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, position: "relative" }}>
@@ -219,7 +220,7 @@ export default function Reports() {
                 <label className="nu-label">Target Policy</label>
                 <select className="nu-select" value={targetPolicyId} onChange={(e) => setTargetPolicyId(e.target.value)}>
                   <option value="">Choose a policy record...</option>
-                  {policies.map(p => <option key={p.id} value={p.id}>{p.policy_number} — {p.holder_name}</option>)}
+                  {policies.map(p => <option key={p.id} value={p.id}>{p.policy_number} — {p.policyholder_name}</option>)}
                 </select>
               </div>
 

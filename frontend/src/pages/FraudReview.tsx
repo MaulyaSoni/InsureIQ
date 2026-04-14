@@ -51,7 +51,10 @@ export default function FraudReview() {
                   onClick={() => setSelectedId(item.policy_id)}
                 >
                   <div className="flex items-center justify-between mb-2">
-                     <span className="font-semibold text-[#F0F4FF]">{item.policy_id.slice(-8) /* fallback since we didn't join policy number */}</span>
+                     <div>
+                        <div className="font-semibold text-[#F0F4FF]">{item.policy_number}</div>
+                        <div className="text-xs text-[#8A95B0]">{item.policyholder_name}</div>
+                     </div>
                      <span className="text-xs text-[#8A95B0]">{new Date(item.created_at).toLocaleDateString()}</span>
                   </div>
                   <div className="flex flex-wrap gap-2">

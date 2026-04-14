@@ -141,7 +141,7 @@ export default function BatchAnalysis() {
                   <tr key={p.id} onClick={() => toggleSelect(p.id)} style={{ cursor: "pointer" }}>
                     <td><input type="checkbox" checked={selectedIds.includes(p.id)} readOnly /></td>
                     <td><span className="nu-mono-value" style={{ color: "#00D4FF" }}>{p.policy_number}</span></td>
-                    <td style={{ color: "#F0F4FF" }}>{p.holder_name}</td>
+                    <td style={{ color: "#F0F4FF" }}>{p.policyholder_name}</td>
                     <td>● {p.risk_band || "LOW"}</td>
                     <td>{p.vehicle_make} {p.vehicle_model}</td>
                   </tr>
