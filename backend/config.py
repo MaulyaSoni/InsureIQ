@@ -41,14 +41,11 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5174",
         ]
         
-        # Add production domains (Vercel and any custom domain)
+        # Add production domains (all Vercel domains + Railway backend)
         if self.environment == "production":
             base_origins.extend([
-                "https://insure-iq-beta.vercel.app",
-                "https://insure-iq-production.vercel.app",
-                "https://insure-iq-maulyasoni-maulyasonis-projects.vercel.app",
+                "https://*.vercel.app",  # Allows any Vercel domain
                 "https://insureiq-production-8adc.up.railway.app",
-                "*",  # Allow all origins in production (frontend needs to call backend)
             ])
         
         # Merge with configured origins
