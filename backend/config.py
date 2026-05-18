@@ -32,7 +32,25 @@ class Settings(BaseSettings):
 
     def cors_list(self) -> list[str]:
         parts = [p.strip() for p in self.cors_origins.split(",") if p.strip()]
-        return parts if parts else ["*"]
+        
+        # Always allow localhost for development
+        base_origins = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ]
+        
+        # Add production domains
+        if self.environment == "production":
+            base_origins.extend([
+                "https://insure-iq-beta.vercel.app",
+                "https://insure-iq-production.vercel.app",
+            ])
+        
+        # Merge with configured origins
+        all_origins = list(set(base_origins + parts))
+        return all_origins if all_origins else ["*"]
 
 
 @lru_cache
