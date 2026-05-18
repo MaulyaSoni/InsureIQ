@@ -1,4 +1,5 @@
-const BASE_URL = '/api';
+const PUBLIC_BASE = (import.meta.env && (import.meta.env.VITE_API_BASE_URL as string)) || '';
+const BASE_URL = PUBLIC_BASE ? `${PUBLIC_BASE.replace(/\/$/, '')}/api` : '/api';
 const VISHLESHAK_CONFIG_KEY = "insureiq_vishleshak_config";
 
 function getToken() {
