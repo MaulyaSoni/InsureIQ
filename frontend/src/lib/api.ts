@@ -1,4 +1,4 @@
-const BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api`;
+const BASE_URL = '/api';
 const VISHLESHAK_CONFIG_KEY = "insureiq_vishleshak_config";
 
 function getToken() {
@@ -18,7 +18,23 @@ export function clearAuthToken() {
   localStorage.removeItem("insureiq_token");
 }
 
+// Add to api.ts — normalises all risk response field names
+export function normaliseRiskResponse(data: any): any {
+  if (!data) return data;
+  const shapFeatures =
+    data.shap_features ||
+    data.top_features ||
+    data.risk_factors ||
+    [];
+  return {
+    ...data,
+    shap_features: shapFeatures,
+    risk_factors: shapFeatures,   // keep both so no component breaks
+  };
+}
+
 export function getVishleshakConfig() {
+
   const fallback = {
     base_url: `${BASE_URL}`,
     api_key: "",
@@ -78,15 +94,30 @@ export const signupApi = (email: string, password: string, name?: string) =>
   register({ email, password, full_name: name || email.split("@")[0] });
 
 // --- Policies ---
-export const getPolicies = async (page = 1, limit = 20) => {
-  const res = await request(`/policies?page=${page}&limit=${limit}`);
-  if (Array.isArray(res)) return res;
-  if (res && Array.isArray(res.policies)) return res.policies;
-  return [];
+const transformPolicy = (p: any) => {
+  if (!p) return p;
+  return {
+    ...p,
+    risk_factors: Array.isArray(p.risk_factors) ? p.risk_factors
+                  : Array.isArray(p.shap_features) ? p.shap_features
+                  : Array.isArray(p.top_features) ? p.top_features
+                  : [],
+  };
 };
 
-export const getPolicy = (id: string) =>
-  request(`/policies/${id}`);
+export const getPolicies = async (page = 1, limit = 20) => {
+  const res = await request(`/policies?page=${page}&limit=${limit}`);
+  let policies = [];
+  if (Array.isArray(res)) policies = res;
+  else if (res && Array.isArray(res.policies)) policies = res.policies;
+  
+  return policies.map(transformPolicy);
+};
+
+export const getPolicy = async (id: string) => {
+  const res = await request(`/policies/${id}`);
+  return transformPolicy(res);
+};
 
 export const createPolicy = (data: Record<string, unknown>) =>
   request("/policies", { method: "POST", body: JSON.stringify(data) });
@@ -109,7 +140,7 @@ export const runAllAnalysis = async (id: string) => {
   const risk = analysis?.risk || {};
   const premium = analysis?.premium || {};
 
-  return {
+  const result = {
     ...base,
     ...analysis,
     risk_prediction_id: analysis.risk_prediction_id || null,
@@ -119,16 +150,20 @@ export const runAllAnalysis = async (id: string) => {
     risk_factors: Array.isArray(risk.shap_features) ? risk.shap_features : (base?.risk_factors || []),
     premium_amount: Number(premium.premium_max ?? base?.premium_amount ?? 0),
   };
+  
+  return normaliseRiskResponse(result);
 };
 
 // --- Risk Assessment ---
-export const assessRisk = (policyId: string) =>
-  request("/risk/assess", { method: "POST", body: JSON.stringify({ policy_id: policyId }) });
+export const assessRisk = async (policyId: string) => {
+  const data = await request("/risk/assess", { method: "POST", body: JSON.stringify({ policy_id: policyId }) });
+  return normaliseRiskResponse(data);
+};
 
 export const explainRisk = async (predictionId: string) => {
   const res = await fetch(`${BASE_URL}/risk/explain`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ prediction_id: predictionId }),
   });
   if (!res.ok) throw new Error("Explanation failed");
@@ -157,8 +192,6 @@ export const predictClaim = async (policyId: string) => {
   };
 };
 
-export const checkClaimEligibility = (data: Record<string, unknown>) =>
-  request("/claims/eligibility", { method: "POST", body: JSON.stringify(data) });
 
 // --- Premium Advisory ---
 export const advisePremium = async (policyId: string) => {
@@ -319,3 +352,45 @@ export const getAuditLog = (page = 1, limit = 50) =>
       timestamp: row.timestamp,
     }))
   );
+
+export interface ClaimEligibilityRequest {
+  policy_id: string;
+  incident_type: 'accident' | 'theft' | 'vandalism' | 'natural_disaster' | 'fire' | 'flood' | string;
+  date_of_incident: string;    // YYYY-MM-DD
+  at_fault: boolean;
+  fir_filed: boolean;
+  hours_since_incident: number;
+  third_party_involved: boolean;
+  damage_estimate: number;
+}
+
+export interface ClaimAssessment {
+  policy_id: string;
+  claim_type: string;
+  eligible: boolean;
+  eligibility_reason: string;
+  risk_of_rejection: 'LOW' | 'MEDIUM' | 'HIGH';
+  rejection_risks: string[];
+  documents_required: string[];
+  ncb_impact: string;
+  estimated_claim_range: string;
+  next_steps: string[];
+}
+
+export async function checkClaimEligibility(
+  data: ClaimEligibilityRequest
+): Promise<ClaimAssessment> {
+  const response = await fetch(`${BASE_URL.replace('/api', '')}/api/claims/eligibility`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Eligibility check failed');
+  }
+  return response.json();
+}

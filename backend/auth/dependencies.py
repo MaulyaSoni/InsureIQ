@@ -1,19 +1,24 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
-
 from backend.auth.jwt_handler import verify_access_token
 from backend.database.db import get_db
 from backend.database.models import User
-
-bearer_scheme = HTTPBearer(auto_error=True)
-
+from typing import Optional, Union
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    request: Request,
     db: Session = Depends(get_db),
 ) -> User:
-    payload = verify_access_token(credentials.credentials)
+    token = request.query_params.get("token")
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    payload = verify_access_token(token)
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     user_id = payload.get("sub")
@@ -24,13 +29,28 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
 
+def try_get_user_id_from_auth_header(request_or_header: Union[Request, Optional[str]]) -> str | None:
+    token = None
 
-def try_get_user_id_from_auth_header(auth_header: str | None) -> str | None:
-    if not auth_header or not auth_header.lower().startswith("bearer "):
+    if hasattr(request_or_header, "query_params") and hasattr(request_or_header, "headers"):
+        request = request_or_header
+        token = request.query_params.get("token")
+        if not token:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+    else:
+        auth_header = request_or_header
+        if auth_header and isinstance(auth_header, str) and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            
+    if not token:
         return None
-    token = auth_header.split(" ", 1)[1].strip()
-    payload = verify_access_token(token)
-    if not payload:
+
+    try:
+        payload = verify_access_token(token)
+        if not payload:
+            return None
+        return payload.get("sub")
+    except Exception:
         return None
-    sub = payload.get("sub")
-    return str(sub) if sub else None

@@ -1,3 +1,5 @@
+import time
+from backend.routers.policies import emit_trace_event
 from backend.agents.state import InsureIQState
 from backend.config import get_settings
 from backend.llm.cache import check_cache, make_cache_key, store_cache
@@ -34,6 +36,9 @@ def _extract_inr_values(text: str) -> list[float]:
 
 
 def premium_node(state: InsureIQState) -> InsureIQState:
+    session_id = state.get("_trace_session_id", "")
+    start_time = time.time()
+    emit_trace_event(session_id, "node_start", {"node": "premium_node", "description": "Processing premium_node"})
     try:
         db = state.get("_db")
         policy_id = state.get("policy_id", "unknown")
@@ -47,6 +52,8 @@ def premium_node(state: InsureIQState) -> InsureIQState:
                 if len(vals) >= 2:
                     state["premium_min"] = float(min(vals[0], vals[1]))
                     state["premium_max"] = float(max(vals[0], vals[1]))
+                duration_ms = int((time.time() - start_time) * 1000)
+                emit_trace_event(session_id, "node_complete", {"node": "premium_node", "duration_ms": duration_ms})
                 return state
 
         prompt = PREMIUM_ADVISOR_PROMPT.format(
@@ -73,7 +80,9 @@ def premium_node(state: InsureIQState) -> InsureIQState:
             {"name": "Claim probability", "value": state.get("claim_probability")},
         ]
         if db is not None:
-            store_cache(cache_key, res, ttl_hours=get_settings().cache_ttl_hours, model=model_name, db=db)
+            store_cache(cache_key, res, model_name, get_settings().cache_ttl_hours, db)
+        duration_ms = int((time.time() - start_time) * 1000)
+        emit_trace_event(session_id, "node_complete", {"node": "premium_node", "duration_ms": duration_ms})
         return state
     except Exception as e:
         print(f"[premium_node] Error: {e}")
@@ -92,4 +101,6 @@ def premium_node(state: InsureIQState) -> InsureIQState:
             f"Advisory unavailable (LLM error). Based on risk band {band}, "
             f"estimated premium range is ₹{lo:,} – ₹{hi:,} per year."
         )
+        duration_ms = int((time.time() - start_time) * 1000)
+        emit_trace_event(session_id, "node_complete", {"node": "premium_node", "duration_ms": duration_ms})
         return state

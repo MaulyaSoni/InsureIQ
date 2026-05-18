@@ -1,3 +1,5 @@
+import time
+from backend.routers.policies import emit_trace_event
 from backend.agents.state import InsureIQState
 from backend.ml.feature_engineer import policy_orm_to_dict, policy_to_feature_vector
 from backend.ml.risk_scorer import probability_to_risk_score, risk_score_to_band, risk_score_to_band_enum
@@ -70,13 +72,17 @@ def _extract_shap(explainer, vector) -> list[dict]:
 
 
 def risk_node(state: InsureIQState) -> InsureIQState:
-    app = state.get("_app")
-    policy = state.get("_policy")
-    if app is None or policy is None:
-        state["error"] = "Missing app or policy context for risk node"
-        return state
-
+    session_id = state.get("_trace_session_id", "")
+    start_time = time.time()
+    emit_trace_event(session_id, "node_start", {"node": "risk_node", "description": "Processing risk_node"})
     try:
+        app = state.get("_app")
+        policy = state.get("_policy")
+        if app is None or policy is None:
+            state["error"] = "Missing app or policy context for risk node"
+            duration_ms = int((time.time() - start_time) * 1000)
+            emit_trace_event(session_id, "node_complete", {"node": "risk_node", "duration_ms": duration_ms})
+            return state
         data = policy_orm_to_dict(policy)
         vector, _ = policy_to_feature_vector(data)
         prob = _predict_probability(app.state.model, vector)

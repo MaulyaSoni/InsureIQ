@@ -7,10 +7,18 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "127.0.0.1",
-    port: 5173,
+    port: 5174,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8000",
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/chat": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/health": {
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
     },
@@ -23,6 +31,5 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
   },
 }));

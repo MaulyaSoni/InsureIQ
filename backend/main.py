@@ -11,6 +11,7 @@ from backend.exceptions import register_exception_handlers
 from backend.middleware.audit_middleware import AuditMiddleware
 from backend.ml.predictor import load_model
 from backend.routers import (
+    chat,
     analytics,
     audit_log,
     auth,
@@ -96,6 +97,7 @@ app.include_router(analytics.router, prefix="/api")
 app.include_router(audit_log.router, prefix="/api")
 app.include_router(batch.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(modules.router, prefix="/api")
 app.include_router(claims.router, prefix="/api")
 app.include_router(premium.router, prefix="/api")

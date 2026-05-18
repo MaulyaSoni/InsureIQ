@@ -3,24 +3,21 @@ import {
   Layers,
   Upload,
   Cloud,
-  FileText,
-  Search,
-  CheckCircle,
-  AlertTriangle,
-  Zap,
-  Loader2,
-  RefreshCw,
-  Download,
-  AlertCircle,
   ChevronDown,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 import { getPolicies, runBatchAnalysis } from "@/lib/api";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, AICard } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { AnimatedList } from "@/components/ui/AnimatedList";
 
 export default function BatchAnalysis() {
   const [policies, setPolicies] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [batchResults, setBatchResults] = useState<any>(null);
@@ -67,207 +64,179 @@ export default function BatchAnalysis() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <h1 className="nu-page-title">Portfolio Batch Engine</h1>
-          <div className="nu-page-subtitle">Massive-scale underwriting assessment and risk cluster identification</div>
-        </div>
-        {viewMode !== "upload" && (
-          <button className="nu-btn-ghost" onClick={() => setViewMode("upload")} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Upload size={14} /> Back to Upload
-          </button>
-        )}
-      </div>
+    <div className="flex flex-col gap-6 animate-fade-in pb-20">
+      <PageHeader
+        title="Portfolio Batch Engine"
+        subtitle="Massive-scale underwriting assessment and risk cluster identification"
+        actions={
+          viewMode !== "upload" && (
+            <Button variant="outline" onClick={() => setViewMode("upload")}>
+              <Upload size={14} className="mr-2" /> Back to Upload
+            </Button>
+          )
+        }
+      />
 
       {/* Upload Zone (Mode: Upload) */}
       {viewMode === "upload" && !processing && (
-        <div 
-          className="nu-card" 
-          style={{ 
-            height: 320, 
-            display: "flex", 
-            flexDirection: "column", 
-            alignItems: "center", 
-            justifyContent: "center", 
-            borderStyle: "dashed", 
-            borderWidth: 2, 
-            borderColor: "#1E2535" 
-          }}
-        >
-          <div 
-            style={{ 
-              width: 80, 
-              height: 80, 
-              borderRadius: "50%", 
-              backgroundColor: "rgba(0, 212, 255, 0.05)", 
-              border: "1px solid rgba(0, 212, 255, 0.2)", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              marginBottom: 20 
-            }}
-          >
-            <Cloud size={32} color="#00D4FF" />
+        <Card className="h-[320px] flex flex-col items-center justify-center border-dashed border-2 border-surface-border bg-surface-raised/20">
+          <div className="w-20 h-20 rounded-full bg-brand-500/10 border border-brand-500/20 flex flex-col items-center justify-center mb-6">
+            <Cloud size={32} className="text-brand-500" />
           </div>
-          <div className="font-mono-ibm" style={{ fontSize: 18, color: "#F0F4FF", fontWeight: 600 }}>Batch Load Pipeline</div>
-          <div className="nu-muted" style={{ marginTop: 8, fontSize: 13 }}>Primary intake for CSV / JSON policy datasets up to 10k entities.</div>
+          <div className="text-lg text-text-primary font-semibold mb-2">Batch Load Pipeline</div>
+          <div className="text-sm text-text-secondary mb-8">Primary intake for CSV / JSON policy datasets up to 10k entities.</div>
           
-          <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
-            <button className="nu-btn-primary" onClick={() => toast.info("CSV selection triggered")}>Select CSV Stream</button>
-            <button className="nu-btn-ghost" onClick={() => setViewMode("select")}>Select from Portfolio</button>
+          <div className="flex gap-4">
+            <Button onClick={() => toast.info("CSV selection triggered")}>Select CSV Stream</Button>
+            <Button variant="outline" onClick={() => setViewMode("select")}>Select from Portfolio</Button>
           </div>
-          <div className="nu-muted" style={{ marginTop: 16, fontSize: 11 }}>IRDAI compliant schema validation v3.2 active</div>
-        </div>
+          <div className="mt-4 text-xs text-text-tertiary">IRDAI compliant schema validation v3.2 active</div>
+        </Card>
       )}
 
       {/* Manual Selection (Mode: Select) */}
       {viewMode === "select" && !processing && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div className="nu-card" style={{ padding: "0" }}>
-            <table className="nu-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 40 }}><input type="checkbox" onChange={() => setSelectedIds(selectedIds.length === policies.length ? [] : policies.map(p => p.id))} /></th>
-                  <th>Policy ID</th>
-                  <th>Holder Name</th>
-                  <th>Risk Band</th>
-                  <th>Asset Class</th>
-                </tr>
-              </thead>
-              <tbody>
-                {policies.map(p => (
-                  <tr key={p.id} onClick={() => toggleSelect(p.id)} style={{ cursor: "pointer" }}>
-                    <td><input type="checkbox" checked={selectedIds.includes(p.id)} readOnly /></td>
-                    <td><span className="nu-mono-value" style={{ color: "#00D4FF" }}>{p.policy_number}</span></td>
-                    <td style={{ color: "#F0F4FF" }}>{p.policyholder_name}</td>
-                    <td>● {p.risk_band || "LOW"}</td>
-                    <td>{p.vehicle_make} {p.vehicle_model}</td>
+        <div className="flex flex-col gap-6">
+          <Card className="overflow-hidden p-0">
+            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-border bg-surface-raised/50 sticky top-0 z-10">
+                    <th className="px-4 py-3 w-10">
+                      <input 
+                        type="checkbox" 
+                        onChange={() => setSelectedIds(selectedIds.length === policies.length ? [] : policies.map(p => p.id))} 
+                        className="rounded bg-surface-raised border-surface-border"
+                      />
+                    </th>
+                    <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs">Policy ID</th>
+                    <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs">Holder Name</th>
+                    <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs">Risk Band</th>
+                    <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs">Asset Class</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div 
-            className="nu-card-elevated" 
-            style={{ 
-              padding: 16, 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "space-between", 
-              borderLeft: "3px solid #0066FF" 
-            }}
-          >
-            <div className="font-mono-ibm" style={{ fontSize: 14 }}>{selectedIds.length} Policies selected for batch analysis</div>
-            <button 
-              className="nu-btn-primary" 
+                </thead>
+                <tbody className="divide-y divide-surface-border">
+                  {policies.map(p => (
+                    <tr key={p.id} onClick={() => toggleSelect(p.id)} className="cursor-pointer hover:bg-surface-raised transition-colors">
+                      <td className="px-4 py-3">
+                        <input type="checkbox" checked={selectedIds.includes(p.id)} readOnly className="rounded bg-surface-raised border-surface-border" />
+                      </td>
+                      <td className="px-4 py-3 font-mono-code text-brand-500 text-xs">{p.policy_number}</td>
+                      <td className="px-4 py-3 text-text-primary font-medium">{p.policyholder_name}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={(p.risk_band || "low").toLowerCase()} size="sm">
+                          {p.risk_band || "LOW"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-text-secondary text-sm">{p.vehicle_make} {p.vehicle_model}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+          <Card className="p-4 flex items-center justify-between border-l-4 border-l-brand-500">
+            <div className="font-mono-code text-text-primary text-sm">{selectedIds.length} Policies selected for batch analysis</div>
+            <Button 
               onClick={handleRunBatch}
               disabled={selectedIds.length === 0}
             >
               Initialize Assessment
-            </button>
-          </div>
+            </Button>
+          </Card>
         </div>
       )}
 
       {/* Processing View */}
       {processing && (
-        <div className="nu-card-ai" style={{ padding: 48, display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div className="kpi-label" style={{ fontSize: 11, marginBottom: 24 }}>Initializing Neural Batch Compute</div>
-          <div style={{ width: "100%", height: 32, backgroundColor: "#111622", borderRadius: 16, border: "1px solid #1E2535", position: "relative", overflow: "hidden", marginBottom: 12 }}>
+        <AICard hoverable={false} className="p-12 flex flex-col items-center justify-center text-center">
+          <div className="text-xs uppercase tracking-wider text-text-tertiary mb-6 font-semibold">Initializing Neural Batch Compute</div>
+          <div className="w-full h-8 bg-surface-border-strong rounded-full overflow-hidden border border-surface-border mb-4">
             <div 
-              style={{ 
-                height: "100%", 
-                width: `${progress}%`, 
-                backgroundColor: "#00D4FF", 
-                transition: "width 400ms ease",
-                boxShadow: "0 0 20px rgba(0, 212, 255, 0.4)" 
-              }} 
+              className="h-full bg-brand-500 transition-all duration-300"
+              style={{ width: `${progress}%`, boxShadow: "0 0 20px rgba(83, 74, 183, 0.4)" }} 
             />
           </div>
-          <div 
-            className="nu-mono-value" 
-            style={{ fontSize: 12, color: "#8A95B0" }}
-          >
+          <div className="font-mono-code text-text-secondary text-sm">
             Processing {Math.floor(selectedIds.length * (progress/100))} / {selectedIds.length} records · 4.8 policies/sec
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20, width: "100%", marginTop: 40 }}>
-            <div className="nu-card" style={{ padding: 16, textAlign: "center" }}>
-              <div className="kpi-label" style={{ fontSize: 9 }}>Processed</div>
-              <div className="nu-mono-value" style={{ fontSize: 20, marginTop: 4 }}>{selectedIds.length}</div>
-            </div>
-            <div className="nu-card" style={{ padding: 16, textAlign: "center" }}>
-              <div className="kpi-label" style={{ fontSize: 9 }}>Errors</div>
-              <div className="nu-mono-value" style={{ fontSize: 20, marginTop: 4, color: "#FF3B5C" }}>0</div>
-            </div>
-            <div className="nu-card" style={{ padding: 16, textAlign: "center" }}>
-              <div className="kpi-label" style={{ fontSize: 9 }}>Nodes Active</div>
-              <div className="nu-mono-value" style={{ fontSize: 20, marginTop: 4 }}>4</div>
-            </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mt-10">
+            <Card className="p-4 text-center bg-surface-raised/50">
+              <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Processed</div>
+              <div className="text-2xl font-mono-code text-text-primary">{selectedIds.length}</div>
+            </Card>
+            <Card className="p-4 text-center bg-surface-raised/50">
+              <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Errors</div>
+              <div className="text-2xl font-mono-code text-error">0</div>
+            </Card>
+            <Card className="p-4 text-center bg-surface-raised/50">
+              <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Nodes Active</div>
+              <div className="text-2xl font-mono-code text-text-primary">4</div>
+            </Card>
           </div>
-        </div>
+        </AICard>
       )}
 
       {/* Results Mode */}
       {viewMode === "results" && batchResults && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <AnimatedList className="flex flex-col gap-6">
           {/* Summary KPIs */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[
-              { label: "Total Streamed", value: selectedIds.length, color: "#00D4FF" },
-              { label: "Avg Risk Index", value: "43.8", color: "#FFB300" },
-              { label: "Critical Flags", value: "7", color: "#FF3B5C" },
-              { label: "Engine Run-time", value: "48.2s", color: "#F0F4FF" },
+              { label: "Total Streamed", value: selectedIds.length, color: "text-brand-500" },
+              { label: "Avg Risk Index", value: "43.8", color: "text-warning" },
+              { label: "Critical Flags", value: "7", color: "text-error" },
+              { label: "Engine Run-time", value: "48.2s", color: "text-text-primary" },
             ].map(s => (
-              <div key={s.label} className="nu-card" style={{ padding: 16 }}>
-                <div className="kpi-label" style={{ fontSize: 9 }}>{s.label}</div>
-                <div className="nu-mono-value" style={{ fontSize: 24, marginTop: 8, color: s.color }}>{s.value}</div>
-              </div>
+              <Card key={s.label} className="p-4">
+                <div className="text-xs text-text-tertiary uppercase tracking-wider">{s.label}</div>
+                <div className={`text-2xl font-mono-code mt-2 ${s.color}`}>{s.value}</div>
+              </Card>
             ))}
           </div>
 
           {/* Risk Clusters */}
-          <div className="nu-card" style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-              <Layers size={14} color="#00D4FF" />
-              <div className="font-mono-ibm" style={{ fontSize: 13, fontWeight: 700 }}>Neural Cluster Analysis</div>
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Layers size={16} className="text-brand-500" />
+              <div className="font-semibold text-text-primary">Neural Cluster Analysis</div>
             </div>
             
-            <div style={{ display: "flex", height: 32, borderRadius: 6, overflow: "hidden", marginBottom: 24 }}>
-              <div style={{ width: "45%", height: "100%", backgroundColor: "#00E676" }} title="LOW Risk (45%)" />
-              <div style={{ width: "30%", height: "100%", backgroundColor: "#0066FF" }} title="MEDIUM Risk (30%)" />
-              <div style={{ width: "18%", height: "100%", backgroundColor: "#FFB300" }} title="HIGH Risk (18%)" />
-              <div style={{ width: "7%", height: "100%", backgroundColor: "#FF3B5C" }} title="CRITICAL Risk (7%)" />
+            <div className="flex h-8 rounded-lg overflow-hidden mb-8">
+              <div className="w-[45%] h-full bg-success" title="LOW Risk (45%)" />
+              <div className="w-[30%] h-full bg-brand-500" title="MEDIUM Risk (30%)" />
+              <div className="w-[18%] h-full bg-warning" title="HIGH Risk (18%)" />
+              <div className="w-[7%] h-full bg-error" title="CRITICAL Risk (7%)" />
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="flex flex-col gap-3">
               {[
-                { band: "CRITICAL", count: 7, reason: "Shared Factor: Vehicle Age > 15 Years (71%)", color: "#FF3B5C" },
-                { band: "HIGH", count: 43, reason: "Shared Factor: Commercial usage declared (65%)", color: "#FF6400" },
-                { band: "MEDIUM", count: 74, reason: "Shared Factor: Prior claims and high-mileage RTOs", color: "#FFB300" },
+                { band: "CRITICAL", count: 7, reason: "Shared Factor: Vehicle Age > 15 Years (71%)", wrapperClass: "border-l-error bg-error/5" },
+                { band: "HIGH", count: 43, reason: "Shared Factor: Commercial usage declared (65%)", wrapperClass: "border-l-warning bg-warning/5" },
+                { band: "MEDIUM", count: 74, reason: "Shared Factor: Prior claims and high-mileage RTOs", wrapperClass: "border-l-success bg-success/5" },
               ].map(c => (
-                <div key={c.band} className="nu-card-elevated" style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 16, borderLeft: `3px solid ${c.color}` }}>
-                  <div style={{ backgroundColor: c.color + "20", color: c.color, fontFamily: "'IBM Plex Mono', monospace", padding: "4px 10px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>{c.band}</div>
-                  <div className="nu-mono-value" style={{ fontSize: 13, minWidth: 24 }}>{c.count}</div>
-                  <div style={{ fontSize: 13, color: "#8A95B0" }}>{c.reason}</div>
-                  <ChevronDown size={14} color="#485068" style={{ marginLeft: "auto" }} />
+                <div key={c.band} className={`p-4 border border-surface-border border-l-4 rounded-lg flex items-center gap-4 ${c.wrapperClass}`}>
+                  <Badge variant={c.band.toLowerCase() as any}>{c.band}</Badge>
+                  <div className="font-mono-code text-sm text-text-primary text-center min-w-[24px]">{c.count}</div>
+                  <div className="text-sm text-text-secondary w-full">{c.reason}</div>
+                  <ChevronDown size={14} className="text-text-tertiary ml-auto" />
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
 
-          <div style={{ display: "flex", gap: 12 }}>
-            <button className="nu-btn-primary" style={{ flex: 1, justifyContent: "center" }}>
-              <Download size={14} style={{ marginRight: 8 }} />
+          <div className="grid grid-cols-2 gap-4">
+            <Button className="h-12 w-full text-md font-medium">
+              <Download size={16} className="mr-2" />
               Download Batch PDF Report
-            </button>
-            <button className="nu-btn-ghost" style={{ flex: 1, justifyContent: "center" }}>
-              <RefreshCw size={14} style={{ marginRight: 8 }} />
+            </Button>
+            <Button variant="outline" className="h-12 w-full text-md font-medium" onClick={() => setViewMode("upload")}>
+              <RefreshCw size={16} className="mr-2" />
               Re-run Batch compute
-            </button>
+            </Button>
           </div>
-        </div>
+        </AnimatedList>
       )}
     </div>
   );

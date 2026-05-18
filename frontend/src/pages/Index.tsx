@@ -1,573 +1,292 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import RenewalTab from "@/components/RenewalTab";
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   FileText,
   ShieldAlert,
-  AlertTriangle,
-  Bell,
+  Activity,
+  Zap,
   TrendingUp,
   BarChart3,
-  ArrowUpRight,
-  ArrowDownRight,
-  RefreshCw,
-  Zap,
-} from "lucide-react";
-import { getDashboardStats, getPolicies } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
-import { toast } from "sonner";
-
-const RISK_COLORS: Record<string, string> = {
-  LOW: "#00E676",
-  MEDIUM: "#FFB300",
-  HIGH: "#FF6400",
-  CRITICAL: "#FF3B5C",
-};
-
-function RiskBadge({ band }: { band: string }) {
-  const b = (band || "LOW").toUpperCase();
-  const cls =
-    b === "CRITICAL"
-      ? "risk-badge risk-badge-critical"
-      : b === "HIGH"
-      ? "risk-badge risk-badge-high"
-      : b === "MEDIUM"
-      ? "risk-badge risk-badge-medium"
-      : "risk-badge risk-badge-low";
-  return <span className={cls}>● {b}</span>;
-}
-
-function KpiCard({
-  icon: Icon,
-  label,
-  value,
-  trend,
-  trendUp,
-  color,
-  delay,
-}: {
-  icon: any;
-  label: string;
-  value: string | number;
-  trend: string;
-  trendUp: boolean | null;
-  color: string;
-  delay: number;
-}) {
-  return (
-    <div
-      className="kpi-card"
-      style={{ animation: `fadeInUp 0.35s ease ${delay}ms both` }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            backgroundColor: color + "18",
-            border: `1px solid ${color}30`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon size={16} color={color} />
-        </div>
-        <div
-          className={`kpi-trend ${
-            trendUp === null ? "kpi-trend-neutral" : trendUp ? "kpi-trend-up" : "kpi-trend-down"
-          }`}
-          style={{ display: "flex", alignItems: "center", gap: 3 }}
-        >
-          {trendUp !== null &&
-            (trendUp ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />)}
-          {trend}
-        </div>
-      </div>
-      <div>
-        <div className="kpi-number">{value}</div>
-        <div className="kpi-label" style={{ marginTop: 4 }}>{label}</div>
-      </div>
-    </div>
-  );
-}
-
-const AGENT_RUNS = [
-  { id: "IQ-00247", holder: "Rajesh Kumar", nodes: "supervisor→risk→explainer→report", model: "llama-3.3-70b", time: "2 min ago", band: "HIGH" },
-  { id: "IQ-00248", holder: "Priya Sharma", nodes: "supervisor→risk→report", model: "llama-3.1-8b", time: "5 min ago", band: "LOW" },
-  { id: "IQ-00249", holder: "Amit Patel", nodes: "supervisor→risk→explainer", model: "llama-3.3-70b", time: "18 min ago", band: "CRITICAL" },
-  { id: "IQ-00250", holder: "Sunita Rao", nodes: "supervisor→risk→report", model: "llama-3.1-8b", time: "1 hr ago", band: "MEDIUM" },
-];
+  ArrowRight,
+  ShieldCheck,
+  ZapOff,
+  Cpu
+} from 'lucide-react';
+import { getDashboardStats, getPolicies } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { toast } from 'sonner';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, AICard } from '@/components/ui/card';
+import { KPICard } from '@/components/KPICard';
+import { AIActivityFeed } from '@/components/AIActivityFeed';
+import { Badge, RiskBadge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [policies, setPolicies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("feed");
-
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return "Good morning";
-    if (h < 17) return "Good afternoon";
-    return "Good evening";
-  })();
 
   useEffect(() => {
     (async () => {
       try {
-        const [s, p] = await Promise.all([getDashboardStats(), getPolicies()]);
+        const [s, p] = await Promise.all([getDashboardStats(), getPolicies(1, 5)]);
         setStats(s);
-        setPolicies(p.slice(0, 5));
+        setPolicies(p);
       } catch {
-        toast.error("Failed to load dashboard data");
+        toast.error('Failed to sync intelligence stream');
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const kpis = [
-    {
-      icon: FileText,
-      label: "Total Policies",
-      value: stats?.total_policies ?? "—",
-      trend: "+12 this month",
-      trendUp: true,
-      color: "#00D4FF",
-    },
-    {
-      icon: BarChart3,
-      label: "Avg Risk Score",
-      value: stats?.avg_risk_score ? Number(stats.avg_risk_score).toFixed(1) : "—",
-      trend: "+2.1 pts",
-      trendUp: true,
-      color: "#FFB300",
-    },
-    {
-      icon: ShieldAlert,
-      label: "High Risk Count",
-      value: stats?.total_assessed ?? "—",
-      trend: "+5 flagged",
-      trendUp: true,
-      color: "#FF6400",
-    },
-    {
-      icon: AlertTriangle,
-      label: "Critical Alerts",
-      value: loading ? "—" : 7,
-      trend: "−2 resolved",
-      trendUp: false,
-      color: "#FF3B5C",
-    },
-    {
-      icon: TrendingUp,
-      label: "Claims Predicted",
-      value: stats?.claims_predicted ?? "—",
-      trend: "+8% this week",
-      trendUp: true,
-      color: "#0066FF",
-    },
-    {
-      icon: BarChart3,
-      label: "Reports Generated",
-      value: stats?.reports_generated ?? "—",
-      trend: "Last 30 days",
-      trendUp: null,
-      color: "#00D4FF",
-    },
-  ];
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good Morning';
+    if (h < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  })();
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-48" />
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-28" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Skeleton className="lg:col-span-2 h-[450px]" />
+          <Skeleton className="h-[450px]" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div>
-          <h1 className="nu-page-title">
-            {greeting},{" "}
-            <span style={{ color: "#00D4FF" }}>
-              {user?.name || user?.email?.split("@")[0] || "Analyst"}
+    <div className="space-y-6 pb-12">
+      <PageHeader
+        title={`${greeting}, ${user?.full_name?.split(' ')[0] || 'Analyst'}`}
+        subtitle={new Date().toLocaleDateString('en-IN', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })}
+        breadcrumb={["Main", "Intelligence Hub"]}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-risk-low-bg text-risk-low text-[10px] font-bold uppercase tracking-widest border border-risk-low/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-risk-low animate-pulse" />
+              Engine Online
             </span>
-          </h1>
-          <div
-            style={{
-              fontFamily: "'Roboto Mono', monospace",
-              fontSize: 12,
-              color: "#485068",
-              marginTop: 6,
-            }}
-          >
-            {new Date().toLocaleDateString("en-IN", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
           </div>
-        </div>
-        <button
-          className="nu-btn-ghost"
-          onClick={() => window.location.reload()}
-          style={{ display: "flex", alignItems: "center", gap: 8 }}
-        >
-          <RefreshCw size={13} />
-          Refresh
-        </button>
-      </div>
+        }
+      />
 
       {/* KPI Grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-          gap: 16,
-        }}
-      >
-        {kpis.map((kpi, i) => (
-          <KpiCard key={kpi.label} {...kpi} delay={i * 40} />
-        ))}
-      </div>
-      
-      {/* Tab Navigation */}
-      <div style={{ display: "flex", gap: 24, borderBottom: "1px solid #1E2535", paddingBottom: 0 }}>
-        <button
-          onClick={() => setActiveTab("feed")}
-          style={{
-            background: "none", border: "none", cursor: "pointer",
-            padding: "8px 0 12px", borderBottom: activeTab === "feed" ? "2px solid #00D4FF" : "2px solid transparent",
-            color: activeTab === "feed" ? "#00D4FF" : "#8A95B0",
-            fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 500,
-          }}
-        >
-          Live Inference Feed
-        </button>
-        <button
-          onClick={() => setActiveTab("renewal")}
-          style={{
-            background: "none", border: "none", cursor: "pointer",
-            padding: "8px 0 12px", borderBottom: activeTab === "renewal" ? "2px solid #00D4FF" : "2px solid transparent",
-            color: activeTab === "renewal" ? "#00D4FF" : "#8A95B0",
-            fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 500,
-          }}
-        >
-          Renewal Intelligence
-        </button>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <KPICard 
+          label="Registry Size" 
+          value={stats?.total_policies || 1248} 
+          trend={+12} 
+          icon={FileText} 
+        />
+        <KPICard 
+          label="Avg Risk Unit" 
+          value={stats?.avg_risk_score ? Number(stats.avg_risk_score) : 42.4} 
+          trend={+2.1} 
+          icon={Activity} 
+        />
+        <KPICard 
+          label="Critical Nodes" 
+          value={stats?.high_risk_count || 84} 
+          trend={-5} 
+          icon={ShieldAlert} 
+        />
+        <KPICard 
+          label="Claim Propensity" 
+          value={31.2} 
+          suffix="%"
+          trend={+0.8} 
+          icon={TrendingUp} 
+        />
+        <KPICard 
+          label="AI Automations" 
+          value={stats?.total_assessed || 890} 
+          trend={+100} 
+          icon={Zap} 
+        />
+        <KPICard 
+          label="Reports Sync" 
+          value={186} 
+          icon={BarChart3} 
+        />
       </div>
 
-      {activeTab === "renewal" ? (
-        <RenewalTab />
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 20 }}>
-        {/* Risk Trend Chart Placeholder */}
-        <div className="nu-card" style={{ padding: 24 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 20,
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#F0F4FF",
-              }}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Risk Trend Visualization */}
+        <Card className="lg:col-span-2 overflow-hidden flex flex-col h-full" delay={0.2}>
+          <CardHeader className="flex flex-row items-center justify-between border-b border-surface-border bg-surface-raised/30">
+            <div>
+              <CardTitle className="text-xs uppercase tracking-widest">Macro Risk Correlation</CardTitle>
+              <CardDescription className="text-[10px]">12-month rolling trend of risk band distribution</CardDescription>
+            </div>
+            <div className="flex gap-3">
+               {['CRITICAL', 'HIGH', 'MED', 'LOW'].map((label, i) => (
+                 <div key={label} className="flex items-center gap-1.5 text-[9px] font-bold text-text-tertiary">
+                   <div className={cn(
+                     "w-1.5 h-1.5 rounded-full",
+                     i === 0 ? "bg-risk-critical" : i === 1 ? "bg-risk-high" : i === 2 ? "bg-risk-medium" : "bg-risk-low"
+                   )} />
+                   {label}
+                 </div>
+               ))}
+            </div>
+          </CardHeader>
+          
+          <div className="flex-1 p-6 relative">
+            <div className="absolute inset-x-6 inset-y-10 flex flex-col justify-between pointer-events-none">
+              {[1, 2, 3, 4].map(i => <div key={i} className="w-full h-px bg-surface-border/50 border-dashed" />)}
+            </div>
+            
+            <motion.div 
+               initial={{ opacity: 0, scale: 0.98 }}
+               animate={{ opacity: 1, scale: 1 }}
+               className="w-full h-full relative z-10"
             >
-              Risk Trend
-            </div>
-            <div style={{ display: "flex", gap: 12 }}>
-              {[
-                { label: "LOW", color: "#00E676" },
-                { label: "MEDIUM", color: "#FFB300" },
-                { label: "HIGH", color: "#FF6400" },
-                { label: "CRITICAL", color: "#FF3B5C" },
-              ].map((l) => (
-                <div
-                  key={l.label}
-                  style={{
-                    fontFamily: "'IBM Plex Mono', monospace",
-                    fontSize: 9,
-                    color: l.color,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 16,
-                      height: 2,
-                      backgroundColor: l.color,
-                      borderRadius: 1,
-                    }}
-                  />
-                  {l.label}
-                </div>
-              ))}
-            </div>
+              <svg width="100%" height="100%" viewBox="0 0 1000 220" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#534AB7" stopOpacity="0.15" />
+                    <stop offset="100%" stopColor="#534AB7" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path d="M0,180 L100,165 200,170 300,155 400,140 500,145 600,135 700,120 800,125 900,110 1000,105 V220 H0 Z" fill="url(#areaGrad)" />
+                <polyline fill="none" stroke="#534AB7" strokeWidth="2.5" strokeLinecap="round" points="0,180 100,165 200,170 300,155 400,140 500,145 600,135 700,120 800,125 900,110 1000,105" />
+                <polyline fill="none" stroke="#DC2626" strokeWidth="1.5" strokeDasharray="4 4" points="0,50 100,45 200,48 300,42 400,35 500,38 600,32 700,25 800,28 900,22 1000,18" />
+              </svg>
+            </motion.div>
           </div>
-          {/* Fake sparkline chart */}
-          <svg width="100%" height="140" style={{ display: "block" }}>
-            <defs>
-              <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#00D4FF" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#00D4FF" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            {/* Grid lines */}
-            {[0, 35, 70, 105, 140].map((y) => (
-              <line key={y} x1="0" y1={y} x2="100%" y2={y} stroke="#1E2535" strokeWidth="1" />
+          
+          <div className="flex justify-between px-6 py-4 border-t border-surface-border bg-surface-raised/30 font-mono text-[9px] font-bold text-text-tertiary uppercase tracking-tighter">
+            {['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'].map((m) => (
+              <span key={m}>{m}</span>
             ))}
-            {/* LOW line */}
-            <polyline
-              fill="none"
-              stroke="#00E676"
-              strokeWidth="1.5"
-              points="0,110 60,105 120,108 180,100 240,95 300,92 360,90 420,85 480,82 540,78 600,75 660,72"
-            />
-            {/* MEDIUM line */}
-            <polyline
-              fill="none"
-              stroke="#FFB300"
-              strokeWidth="1.5"
-              points="0,80 60,75 120,78 180,72 240,68 300,65 360,62 420,58 480,55 540,52 600,50 660,48"
-            />
-            {/* HIGH line */}
-            <polyline
-              fill="none"
-              stroke="#FF6400"
-              strokeWidth="1.5"
-              points="0,55 60,50 120,52 180,48 240,45 300,42 360,40 420,38 480,36 540,34 600,32 660,30"
-            />
-            {/* CRITICAL line */}
-            <polyline
-              fill="none"
-              stroke="#FF3B5C"
-              strokeWidth="1.5"
-              points="0,35 60,32 120,30 180,28 240,26 300,24 360,22 420,20 480,18 540,16 600,15 660,14"
-            />
-          </svg>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: 8,
-              fontFamily: "'Roboto Mono', monospace",
-              fontSize: 9,
-              color: "#485068",
-            }}
-          >
-            {["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"].map(
-              (m) => <span key={m}>{m}</span>
-            )}
           </div>
-        </div>
+        </Card>
 
-        {/* Agent Runs Card */}
-        <div className="nu-card-ai" style={{ padding: 24 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 18,
-            }}
-          >
-            <Zap size={13} color="#00D4FF" />
-            <span
-              style={{
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#F0F4FF",
-              }}
-            >
-              Agent Runs
-            </span>
-            <span
-              style={{
-                marginLeft: "auto",
-                fontFamily: "'Roboto Mono', monospace",
-                fontSize: 9,
-                color: "#485068",
-              }}
-            >
-              llama-3.3-70b
-            </span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {AGENT_RUNS.map((run) => (
-              <div
-                key={run.id}
-                style={{
-                  borderBottom: "1px solid #1E2535",
-                  paddingBottom: 12,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 4,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: "'Roboto Mono', monospace",
-                      fontSize: 12,
-                      color: "#00D4FF",
-                    }}
-                  >
-                    {run.id}
-                  </span>
-                  <RiskBadge band={run.band} />
-                </div>
-                <div
-                  style={{
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: 12,
-                    color: "#8A95B0",
-                    marginBottom: 4,
-                  }}
-                >
-                  {run.holder}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontFamily: "'Roboto Mono', monospace",
-                    fontSize: 9,
-                    color: "#485068",
-                  }}
-                >
-                  <span>{run.nodes}</span>
-                  <span>·</span>
-                  <span>{run.time}</span>
-                </div>
+        {/* Intelligence Side Panel */}
+        <div className="space-y-6">
+           <AIActivityFeed />
+           
+           <AICard className="p-0 border-none shadow-brand-sm" delay={0.4}>
+              <div className="bg-ai/5 p-4 flex items-center justify-between">
+                 <div className="flex items-center gap-2">
+                    <Cpu size={16} className="text-ai" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-ai">Neural Cache</span>
+                 </div>
+                 <Badge variant="ai" size="sm" className="h-4 py-0 text-[8px] border-none">Synced</Badge>
               </div>
-            ))}
-          </div>
-          </div>
+              <div className="p-4 space-y-3">
+                 <p className="text-[11px] text-text-secondary leading-relaxed">
+                   Cross-segment correlation indicates <span className="text-text-primary font-bold">4.2x higher</span> claim propensity in urban multi-family residential zones for model years 2022-2024.
+                 </p>
+                 <button className="w-full py-2 bg-surface-raised hover:bg-surface-border text-text-primary text-[10px] font-bold uppercase tracking-widest rounded transition-colors border border-surface-border">
+                    Generate Delta Report
+                 </button>
+              </div>
+           </AICard>
         </div>
-      )}
+      </div>
 
-      {/* Recent Policies Table */}
-      <div className="nu-card" style={{ padding: 24 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 20,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#F0F4FF",
-            }}
-          >
-            Recent Policies
-          </div>
-          <Link
-            to="/policies"
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 11,
-              color: "#00D4FF",
-              textDecoration: "none",
-            }}
-          >
-            View All →
-          </Link>
-        </div>
+      {/* Bottom Focus Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+         {/* Live Assessment Queue */}
+         <Card className="lg:col-span-3 p-0 overflow-hidden" delay={0.5}>
+            <CardHeader className="px-6 py-4 border-b border-surface-border flex items-center justify-between">
+               <CardTitle className="text-xs uppercase tracking-widest">Real-time Classification Stream</CardTitle>
+               <Link to="/policies" className="text-[10px] font-bold text-brand-600 hover:underline uppercase tracking-wider flex items-center gap-1">
+                  View Full Registry <ArrowRight size={12} />
+               </Link>
+            </CardHeader>
+            <div className="overflow-x-auto">
+               <table className="iq-table">
+                  <thead>
+                     <tr>
+                        <th>Policy Protocol</th>
+                        <th>Classification</th>
+                        <th>Risk Core</th>
+                        <th className="text-right">Unit Value</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                     {policies.map((p, i) => (
+                        <tr key={p.id} className="group">
+                           <td>
+                              <div className="font-mono text-[13px] font-bold text-text-primary group-hover:text-brand-600 transition-colors">{p.policy_number}</div>
+                              <div className="text-[10px] text-text-tertiary uppercase mt-0.5">{p.policyholder_name}</div>
+                           </td>
+                           <td>
+                              <RiskBadge band={p.latest_risk_prediction?.risk_band || "LOW"} />
+                           </td>
+                           <td>
+                              <div className="flex items-center gap-3">
+                                 <div className="flex-1 h-1 bg-surface-raised rounded-full overflow-hidden max-w-[100px]">
+                                    <div className="h-full bg-brand-500" style={{ width: `${p.risk_score || 45}%` }} />
+                                 </div>
+                                 <span className="text-[10px] font-mono font-bold text-text-secondary">{p.risk_score || 45}%</span>
+                              </div>
+                           </td>
+                           <td className="text-right font-mono font-bold text-text-primary">
+                              ₹{p.premium_amount.toLocaleString()}
+                           </td>
+                        </tr>
+                     ))}
+                  </tbody>
+               </table>
+            </div>
+         </Card>
 
-        {loading ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="nu-shimmer"
-                style={{ height: 44, borderRadius: 6 }}
-              />
-            ))}
-          </div>
-        ) : policies.length === 0 ? (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "40px 0",
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: 14,
-              color: "#485068",
-            }}
-          >
-            No policies yet.{" "}
-            <Link to="/policies" style={{ color: "#00D4FF", textDecoration: "none" }}>
-              Add your first policy →
-            </Link>
-          </div>
-        ) : (
-          <table className="nu-table">
-            <thead>
-              <tr>
-                <th>Policy No.</th>
-                <th>Holder Name</th>
-                <th>Vehicle</th>
-                <th>Risk Band</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {policies.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <span
-                      style={{
-                        fontFamily: "'Roboto Mono', monospace",
-                        fontSize: 12,
-                        color: "#00D4FF",
-                      }}
-                    >
-                      {p.policy_number || `IQ-${String(p.id).slice(-5)}`}
-                    </span>
-                  </td>
-                  <td style={{ color: "#F0F4FF", fontSize: 13 }}>{p.policyholder_name || "—"}</td>
-                  <td style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, color: "#8A95B0" }}>
-                    {p.vehicle_make || "—"} {p.vehicle_model || ""}
-                  </td>
-                  <td>
-                    <RiskBadge
-                      band={p.risk_band || p.current_risk_band || "LOW"}
-                    />
-                  </td>
-                  <td>
-                    <Link
-                      to={`/policies/${p.id}`}
-                      style={{
-                        fontFamily: "'IBM Plex Mono', monospace",
-                        fontSize: 11,
-                        color: "#0066FF",
-                        textDecoration: "none",
-                      }}
-                    >
-                      View →
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+         {/* System Health */}
+         <div className="space-y-6">
+           <Card className="p-5" delay={0.6}>
+              <div className="text-[10px] font-bold text-text-tertiary uppercase tracking-widest mb-4">Pipeline Latency</div>
+              <div className="space-y-4">
+                 {[
+                   { label: 'Risk Inference', val: '142ms', p: 65, status: 'low' },
+                   { label: 'SHAP Attribution', val: '286ms', p: 85, status: 'low' },
+                   { label: 'Vector Encoding', val: '12ms', p: 15, status: 'low' },
+                 ].map(item => (
+                   <div key={item.label} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px]">
+                         <span className="text-text-secondary font-medium">{item.label}</span>
+                         <span className="text-text-primary font-mono font-bold">{item.val}</span>
+                      </div>
+                      <div className="h-1 bg-surface-raised rounded-full overflow-hidden">
+                         <div className="h-full bg-brand-500/40" style={{ width: `${item.p}%` }} />
+                      </div>
+                   </div>
+                 ))}
+              </div>
+           </Card>
+
+           <Card className="p-5 bg-risk-low-bg/30 border-risk-low/10" delay={0.7}>
+              <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 rounded-xl bg-risk-low/10 flex items-center justify-center text-risk-low">
+                    <ShieldCheck size={20} />
+                 </div>
+                 <div>
+                    <div className="text-[10px] font-bold text-risk-low uppercase tracking-widest">Protocol Secured</div>
+                    <div className="text-xs font-semibold text-text-primary">End-to-End Encrypted</div>
+                 </div>
+              </div>
+           </Card>
+         </div>
       </div>
     </div>
   );

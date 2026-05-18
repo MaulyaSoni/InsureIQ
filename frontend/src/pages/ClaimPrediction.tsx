@@ -2,20 +2,21 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   TrendingUp,
-  History,
-  Info,
-  ShieldCheck,
-  AlertTriangle,
-  Loader2,
   RefreshCw,
   Zap,
   IndianRupee,
-  Calendar,
-  ChevronDown,
   CheckCircle,
+  FileText,
+  AlertTriangle,
 } from "lucide-react";
 import { getPolicies, getPolicy, predictClaim, checkClaimEligibility } from "@/lib/api";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, AICard } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { AnimatedList } from "@/components/ui/AnimatedList";
 
 export default function ClaimPrediction() {
   const [searchParams] = useSearchParams();
@@ -26,6 +27,7 @@ export default function ClaimPrediction() {
   const [policy, setPolicy] = useState<any>(null);
   const [prediction, setPrediction] = useState<any>(null);
   const [eligibility, setEligibility] = useState<any>(null);
+  const [eligibilityError, setEligibilityError] = useState<string | null>(null);
   const [incidentData, setIncidentData] = useState<any>({
     incident_type: "",
     date_of_incident: new Date().toISOString().split('T')[0],
@@ -36,7 +38,8 @@ export default function ClaimPrediction() {
     damage_estimate_inr: 0,
   });
   const [loading, setLoading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzingPrediction, setAnalyzingPrediction] = useState(false);
+  const [analyzingEligibility, setAnalyzingEligibility] = useState(false);
 
   useEffect(() => {
     fetchPolicies();
@@ -66,41 +69,53 @@ export default function ClaimPrediction() {
 
   const handlePredict = async () => {
     if (!selectedPolicyId) return;
-    setAnalyzing(true);
+    
+    // Clear previous results
+    setPrediction(null);
+    setEligibility(null);
+    setEligibilityError(null);
+    
+    setAnalyzingPrediction(true);
     try {
       const predResult = await predictClaim(selectedPolicyId);
       setPrediction(predResult);
+      setAnalyzingPrediction(false);
 
       if (incidentData.incident_type && incidentData.date_of_incident) {
-        const eligResult = await checkClaimEligibility({
-          policy_id: selectedPolicyId,
-          ...incidentData,
-        });
-        setEligibility(eligResult);
+        setAnalyzingEligibility(true);
+        try {
+          const eligResult = await checkClaimEligibility({
+            policy_id: selectedPolicyId,
+            ...incidentData,
+          });
+          setEligibility(eligResult);
+        } catch (eligErr: any) {
+          setEligibilityError(eligErr?.message || "Eligibility analysis failed. Claim probability is still available.");
+        }
       }
       toast.success("Intelligence assessment stream finalized");
     } catch (err: any) {
       toast.error(err.message || "Prediction node error");
     } finally {
-      setAnalyzing(false);
+      setAnalyzingPrediction(false);
+      setAnalyzingEligibility(false);
     }
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Header */}
-      <div>
-        <h1 className="nu-page-title">Claim Intelligence</h1>
-        <div className="nu-page-subtitle">Predictive liability scoring and ReAct eligibility attribution</div>
-      </div>
+    <div className="flex flex-col gap-6 animate-fade-in">
+      <PageHeader
+        title="Claim Intelligence"
+        subtitle="Predictive liability scoring and ReAct eligibility attribution"
+      />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 2fr", gap: 24, alignItems: "start" }}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Left: Input Panel */}
-        <div className="nu-card" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 24 }}>
+        <Card className="p-6 flex flex-col gap-6">
           <div>
-            <label className="nu-label">Select Target Policy</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mb-2 block">Select Target Policy</label>
             <select
-              className="nu-select"
+              className="w-full bg-surface-raised border border-surface-border rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-brand-500 transition-colors"
               value={selectedPolicyId}
               onChange={(e) => {
                 setSelectedPolicyId(e.target.value);
@@ -116,15 +131,18 @@ export default function ClaimPrediction() {
             </select>
           </div>
 
-          <div className="nu-divider" />
+          <div className="h-px w-full bg-surface-border my-2" />
 
           {policy && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <div className="kpi-label" style={{ fontSize: 10 }}>Incident Attributes</div>
+            <div className="flex flex-col gap-5">
+              <div className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Incident Attributes</div>
               
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span className="nu-muted" style={{ fontSize: 12 }}>Incident Type</span>
-                <select className="nu-select" style={{ padding: 8 }} onChange={(e) => setIncidentData({ ...incidentData, incident_type: e.target.value })}>
+              <div className="flex flex-col gap-2">
+                <span className="text-sm text-text-secondary">Incident Type</span>
+                <select 
+                  className="bg-surface-raised border border-surface-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500 w-full" 
+                  onChange={(e) => setIncidentData({ ...incidentData, incident_type: e.target.value })}
+                >
                   <option value="">Select type...</option>
                   <option value="accident">Accident / Collision</option>
                   <option value="theft">Total Theft</option>
@@ -134,151 +152,163 @@ export default function ClaimPrediction() {
                 </select>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span className="nu-muted" style={{ fontSize: 12 }}>Incident Date</span>
-                <div style={{ position: "relative" }}>
-                  <input type="date" className="nu-input" style={{ padding: 8 }} onChange={(e) => setIncidentData({ ...incidentData, date_of_incident: e.target.value })} />
-                </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-sm text-text-secondary">Incident Date</span>
+                <input 
+                  type="date" 
+                  className="bg-surface-raised border border-surface-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500 w-full" 
+                  onChange={(e) => setIncidentData({ ...incidentData, date_of_incident: e.target.value })} 
+                />
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span className="nu-muted" style={{ fontSize: 12 }}>FIR Report Filed?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" defaultChecked onChange={(e) => setIncidentData({ ...incidentData, fir_filed: e.target.checked })} />
-                  <div className="w-9 h-5 bg-nu-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
-                </label>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-text-secondary">FIR Report Filed?</span>
+                <button
+                  onClick={() => setIncidentData({ ...incidentData, fir_filed: !incidentData.fir_filed })}
+                  className={`w-11 h-6 rounded-full relative transition-colors ${incidentData.fir_filed ? 'bg-brand-500' : 'bg-surface-border-strong'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${incidentData.fir_filed ? 'left-6' : 'left-1'}`} />
+                </button>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span className="nu-muted" style={{ fontSize: 12 }}>Policyholder at Fault?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" onChange={(e) => setIncidentData({ ...incidentData, at_fault: e.target.checked })} />
-                  <div className="w-9 h-5 bg-nu-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
-                </label>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-text-secondary">Policyholder at Fault?</span>
+                <button
+                  onClick={() => setIncidentData({ ...incidentData, at_fault: !incidentData.at_fault })}
+                  className={`w-11 h-6 rounded-full relative transition-colors ${incidentData.at_fault ? 'bg-brand-500' : 'bg-surface-border-strong'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${incidentData.at_fault ? 'left-6' : 'left-1'}`} />
+                </button>
               </div>
 
-              <button
-                className="nu-btn-primary"
+              <Button
                 onClick={handlePredict}
-                disabled={analyzing}
-                style={{ width: "100%", justifyContent: "center", height: 44 }}
+                disabled={analyzingPrediction || analyzingEligibility}
+                className="w-full mt-2"
               >
-                {analyzing ? <RefreshCw className="animate-spin" size={16} /> : <TrendingUp size={16} />}
-                Assess Eligibility
-              </button>
+                {analyzingPrediction || analyzingEligibility ? <RefreshCw className="animate-spin mr-2" size={16} /> : <TrendingUp className="mr-2" size={16} />}
+                {analyzingPrediction ? "Predicting Risk..." : analyzingEligibility ? "Tracing LLM Eligibility..." : "Assess Eligibility"}
+              </Button>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Right: Results Analysis */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <div className="lg:col-span-2 flex flex-col gap-6">
           {loading ? (
-            <div className="nu-card" style={{ padding: 100, textAlign: "center" }}>
-              <Loader2 className="animate-spin" size={24} color="#00D4FF" />
-            </div>
+            <Card className="p-20 flex justify-center items-center">
+              <Skeleton className="h-10 w-10 rounded-full animate-spin" />
+            </Card>
           ) : !prediction ? (
-            <div className="nu-card" style={{ padding: 100, textAlign: "center", opacity: 0.5 }}>
-              <IndianRupee size={40} color="#1E2535" style={{ margin: "0 auto 16px" }} />
-              <div className="font-mono-ibm text-sm">Awaiting Record Stream Input</div>
-            </div>
+            <Card className="p-20 text-center opacity-60">
+              <IndianRupee size={40} className="mx-auto text-text-tertiary mb-4" />
+              <div className="text-sm font-mono-code text-text-secondary">Awaiting Record Stream Input</div>
+            </Card>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <AnimatedList className="flex flex-col gap-6">
               {/* Primary Result Hero */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                <div className="nu-card-ai" style={{ padding: 24, textAlign: "center" }}>
-                  <div className="kpi-label" style={{ fontSize: 10 }}>Probability Index</div>
-                  <div className="nu-mono-value" style={{ fontSize: 56, marginTop: 8, color: prediction.claim_probability > 0.5 ? "#FF3B5C" : "#00E676" }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <AICard hoverable={false} className="p-6 text-center">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Probability Index</div>
+                  <div className={`text-5xl font-mono-code font-bold mt-4 mb-2 ${prediction.claim_probability > 0.5 ? 'text-error' : 'text-success'}`}>
                     {(prediction.claim_probability * 100).toFixed(1)}%
                   </div>
-                  <div
-                    style={{
-                      fontFamily: "'IBM Plex Mono', monospace",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: prediction.claim_probability > 0.5 ? "#FF3B5C" : "#00E676",
-                      letterSpacing: "0.1em",
-                      marginTop: 4,
-                    }}
-                  >
-                    ● {prediction.claim_probability > 0.5 ? "ELEVATED RISK" : "NOMINAL RISK"}
-                  </div>
-                </div>
+                  <Badge variant={prediction.claim_probability > 0.5 ? "critical" : "low"}>
+                    {prediction.claim_probability > 0.5 ? "ELEVATED RISK" : "NOMINAL RISK"}
+                  </Badge>
+                </AICard>
 
-                <div className="nu-card" style={{ padding: 24, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                  <div className="kpi-label" style={{ fontSize: 10 }}>Eligibility Verdict</div>
-                  <div
-                    style={{
-                      fontFamily: "'IBM Plex Mono', monospace",
-                      fontSize: 32,
-                      fontWeight: 700,
-                      color: "#FFB300",
-                      marginTop: 12,
-                    }}
-                  >
-                    CONDITIONAL
+                <Card className="p-6 text-center flex flex-col justify-center">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Eligibility Verdict</div>
+                  <div className={`text-2xl font-mono-code font-bold mt-4 mb-2 ${eligibility ? (eligibility.eligible ? 'text-success' : 'text-error') : 'text-warning'}`}>
+                    {eligibility ? (eligibility.eligible ? "APPROVED" : "REJECTED") : "PENDING DATA"}
                   </div>
-                  <div style={{ fontSize: 11, color: "#485068", marginTop: 4 }}>*NCB protection will be lost if claim is filed</div>
-                </div>
+                  <div className="text-xs text-text-secondary">
+                    {eligibility ? eligibility.eligibility_reason : "Awaiting detailed incident data"}
+                  </div>
+                </Card>
               </div>
 
-              {/* ReAct Trace Timeline */}
-              <div className="nu-card-elevated" style={{ padding: 24 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-                  <Zap size={14} color="#00D4FF" fill="#00D4FF" />
-                  <span className="font-mono-ibm" style={{ fontSize: 14, fontWeight: 600 }}>Claim Eligibility ReAct Trace</span>
-                </div>
-                
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div className="react-step">
-                    <div className="react-step-dot" />
-                    <div className="react-step-type">Thought 1</div>
-                    <div className="react-step-content">Checking policy coverage type for commercial use declaration...</div>
-                    <div className="react-step-code">coverage_check(policy_id='IQ-00247')</div>
-                  </div>
-                  <div className="react-step">
-                    <div className="react-step-dot" />
-                    <div className="react-step-type">Observation 1</div>
-                    <div className="react-step-content">Coverage: Comprehensive. Commercial use declared in Mumbai RTO. Policy active.</div>
-                  </div>
-                  <div className="react-step">
-                    <div className="react-step-dot" />
-                    <div className="react-step-type">Thought 2</div>
-                    <div className="react-step-content">FIR reported within 24h. Third party involved. Evaluating NCB impact rules...</div>
-                    <div className="react-step-code">eligibility_rule_check(fir_filed=true, fault=false)</div>
-                  </div>
-                  <div className="react-step">
-                    <div className="react-step-dot" />
-                    <div className="react-step-type">Observation 2</div>
-                    <div className="react-step-content">Eligible with NCB impact. Recommended for conditional approval.</div>
-                  </div>
-                  <div className="react-step" style={{ paddingBottom: 0 }}>
-                    <div className="react-step-dot" style={{ borderColor: "#00E676" }} />
-                    <div className="react-step-type" style={{ color: "#00E676" }}>Final Verdict</div>
-                    <div className="react-step-content" style={{ color: "#F0F4FF", fontWeight: 600 }}>CONDITIONAL APPROVAL — NCB IMPACT: HIGH</div>
-                  </div>
-                </div>
-              </div>
+              {/* Eligibility Loading/Error States */}
+              {analyzingEligibility && (
+                <Card className="p-12 text-center">
+                  <RefreshCw className="animate-spin mx-auto text-ai mb-4" size={24} />
+                  <div className="text-sm text-text-secondary">AI analyzing claim eligibility...</div>
+                </Card>
+              )}
 
-              {/* Document Check */}
-              <div className="nu-card" style={{ padding: 24 }}>
-                <div className="kpi-label" style={{ fontSize: 10, marginBottom: 16 }}>Required Compliance Artifacts</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  {[
-                    "FIR Copy (Mandatory)",
-                    "Driving License",
-                    "Insurance Policy",
-                    "RC Book Snapshot",
-                    "Damage Estimate",
-                    "KYC Evidence",
-                  ].map((doc) => (
-                    <div key={doc} style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, borderRadius: 6, backgroundColor: "#111622", border: "1px solid #1E2535" }}>
-                      <CheckCircle size={14} color="#00E676" />
-                      <span className="nu-muted" style={{ fontSize: 12 }}>{doc}</span>
+              {eligibilityError && (
+                <Card className="p-6 bg-error/5 border-error/20">
+                  <div className="text-error text-sm font-medium">{eligibilityError}</div>
+                </Card>
+              )}
+
+              {/* Eligibility details */}
+              {eligibility && (
+                <Card className="p-6 flex flex-col gap-6">
+                  <div className="flex items-center gap-2">
+                    <Zap size={16} className="text-ai" />
+                    <span className="font-semibold text-text-primary">Eligibility Analysis</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-surface-raised border border-surface-border rounded-lg">
+                      <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">NCB Impact</div>
+                      <div className="text-sm text-text-primary font-medium">{eligibility.ncb_impact}</div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+                    
+                    <div className="p-4 bg-surface-raised border border-surface-border rounded-lg">
+                      <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">Estimated Claim Range</div>
+                      <div className="text-sm text-brand-500 font-mono-code font-medium">{eligibility.estimated_claim_range}</div>
+                    </div>
+                  </div>
+
+                  {eligibility.rejection_risks && eligibility.rejection_risks.length > 0 && (
+                    <div className="p-4 bg-error/10 border border-error/20 rounded-lg">
+                      <div className="text-xs text-error mb-3 font-semibold uppercase tracking-wider">Rejection Risks ({eligibility.risk_of_rejection})</div>
+                      <ul className="space-y-2">
+                        {eligibility.rejection_risks.map((risk: string, i: number) => (
+                           <li key={i} className="flex items-start gap-2 text-sm text-text-primary">
+                             <AlertTriangle size={14} className="text-error mt-0.5 shrink-0" />
+                             <span>{risk}</span>
+                           </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="mt-2 h-px w-full bg-surface-border" />
+
+                  <div className="flex flex-col gap-4">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Next Steps</div>
+                    <ol className="list-decimal pl-4 space-y-2 text-sm text-text-secondary marker:text-text-tertiary">
+                      {eligibility.next_steps?.map((step: string, i: number) => (
+                        <li key={i} className="pl-1">{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div className="flex flex-col gap-4 mt-2">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Documents Required</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(eligibility.documents_required || [
+                        "FIR Copy (Mandatory)",
+                        "Driving License",
+                        "Insurance Policy",
+                        "RC Book Snapshot",
+                        "Damage Estimate",
+                        "KYC Evidence",
+                      ]).map((doc: string) => (
+                        <div key={doc} className="flex items-center gap-3 p-3 rounded-lg bg-surface-raised border border-surface-border">
+                          <FileText size={14} className="text-brand-500" />
+                          <span className="text-sm text-text-primary">{doc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </AnimatedList>
           )}
         </div>
       </div>

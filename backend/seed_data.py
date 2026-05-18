@@ -316,7 +316,11 @@ EXPLANATIONS = {
 
 def seed_db():
     init_db()
+    from sqlalchemy import text
     db = SessionLocal()
+    # Disable foreign keys temporarily for seeding performance and to avoid sequence issues in SQLite
+    db.execute(text("PRAGMA foreign_keys=OFF"))
+    db.commit()
 
     # Clean up any stale demo user with old .local email
     old_demo = db.query(User).filter(User.email == "demo@insureiq.local").first()

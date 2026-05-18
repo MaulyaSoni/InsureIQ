@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AlertCircle, RefreshCw, FileText, ArrowRight } from "lucide-react";
 import { getRenewalUpcoming, getRenewalAdvisory } from "@/lib/advancedApi";
+import { Card, AICard } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function RenewalTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -18,56 +21,64 @@ export default function RenewalTab() {
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="nu-card bg-[#0E1118] border border-[#1E2535] p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <AlertCircle size={20} className="text-[#FFB300]" />
-          <h2 className="font-mono-ibm text-[15px] font-semibold text-[#F0F4FF]">
+    <div className="flex flex-col gap-6 animate-fade-in">
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-2">
+          <AlertCircle size={20} className="text-warning" />
+          <h2 className="font-semibold text-text-primary text-base">
             Upcoming Renewals & Lapse Risk
           </h2>
         </div>
-        <p className="text-sm text-[#8A95B0] mb-6">
+        <p className="text-sm text-text-secondary mb-8">
           Policies expiring in the next 60 days, scored for renewal risk and premium adjustment.
         </p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {/* Table */}
-          <div className="border border-[#1E2535] rounded-lg overflow-hidden">
-            <table className="w-full text-left">
+          <div className="border border-surface-border rounded-lg overflow-hidden bg-surface-raised/30">
+            <table className="w-full text-left text-sm">
               <thead>
-                <tr className="bg-[#1E2535] text-[#8A95B0] text-xs font-mono-ibm">
-                  <th className="p-3 font-semibold">Policy No.</th>
-                  <th className="p-3 font-semibold">Expiry Date</th>
-                  <th className="p-3 font-semibold">Renewal Score</th>
-                  <th className="p-3 font-semibold">Action</th>
+                <tr className="bg-surface-raised/50 border-b border-surface-border">
+                  <th className="px-4 py-3 font-medium text-text-tertiary uppercase tracking-wider text-xs">Policy No.</th>
+                  <th className="px-4 py-3 font-medium text-text-tertiary uppercase tracking-wider text-xs">Expiry Date</th>
+                  <th className="px-4 py-3 font-medium text-text-tertiary uppercase tracking-wider text-xs">Renewal Score</th>
+                  <th className="px-4 py-3 font-medium text-text-tertiary uppercase tracking-wider text-xs">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1E2535] text-sm text-[#F0F4FF]">
+              <tbody className="divide-y divide-surface-border text-text-primary">
                 {isLoading ? (
-                  <tr><td colSpan={4} className="p-4 text-center text-[#8A95B0]">Fetching upcoming...</td></tr>
+                  <tr>
+                    <td colSpan={4} className="p-8">
+                       <div className="flex flex-col gap-3 items-center justify-center">
+                          <Skeleton className="h-6 w-full max-w-[300px]" />
+                          <Skeleton className="h-6 w-full max-w-[280px]" />
+                          <Skeleton className="h-6 w-full max-w-[320px]" />
+                       </div>
+                    </td>
+                  </tr>
                 ) : !Array.isArray(upcoming) || upcoming.length === 0 ? (
-                  <tr><td colSpan={4} className="p-4 text-center text-[#8A95B0]">No policies expiring in 60 days.</td></tr>
+                  <tr><td colSpan={4} className="p-8 text-center text-text-tertiary">No policies expiring in 60 days.</td></tr>
                 ) : (
                   upcoming.map((item: any) => (
                     <tr 
                       key={item.id}
-                      className={`hover:bg-[#0B0D14] cursor-pointer ${selectedId === item.id ? 'bg-[#00D4FF]/10' : ''}`}
+                      className={`hover:bg-surface-raised cursor-pointer transition-colors ${selectedId === item.id ? 'bg-brand-500/5' : ''}`}
                       onClick={() => setSelectedId(item.id)}
                     >
-                      <td className="p-3 font-mono-ibm text-xs">{item.policy_number}</td>
-                      <td className="p-3 text-xs">{new Date(item.expiry_date).toLocaleDateString()}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                           <div className="w-full bg-[#1E2535] h-1.5 rounded-full overflow-hidden max-w-[80px]">
-                              <div className="h-full bg-[#00D4FF]" style={{ width: `${item.renewal_risk_score}%` }}></div>
+                      <td className="px-4 py-3 font-mono-code text-brand-500 font-semibold">{item.policy_number}</td>
+                      <td className="px-4 py-3 text-text-secondary">{new Date(item.expiry_date).toLocaleDateString()}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                           <div className="w-full bg-surface-border-strong h-1.5 rounded-full overflow-hidden max-w-[80px]">
+                              <div className="h-full bg-brand-500" style={{ width: `${item.renewal_risk_score}%` }}></div>
                            </div>
-                           <span className="text-[10px] font-mono-ibm">{item.renewal_risk_score}</span>
+                           <span className="text-[10px] font-mono-code text-text-tertiary">{item.renewal_risk_score}</span>
                         </div>
                       </td>
-                      <td className="p-3">
-                        <button className="text-[#00D4FF] hover:text-[#00D4FF]/80 text-xs flex items-center gap-1">
-                          Advisory <ArrowRight size={12} />
-                        </button>
+                      <td className="px-4 py-3">
+                        <Button variant="ghost" size="sm" className="h-8 px-2 text-brand-500 hover:text-brand-400">
+                          Advisory <ArrowRight size={14} className="ml-1" />
+                        </Button>
                       </td>
                     </tr>
                   ))
@@ -77,37 +88,37 @@ export default function RenewalTab() {
           </div>
 
           {/* Advisory Panel */}
-          <div className="bg-[#0B0D14] min-h-[300px] border border-[#1E2535] rounded-lg p-5">
+          <AICard hoverable={false} className="min-h-[350px] p-6 flex flex-col items-center justify-center">
             {!selectedId ? (
-              <div className="flex items-center justify-center h-full text-[#8A95B0] flex-col gap-2">
-                <FileText size={32} />
+              <div className="flex flex-col items-center justify-center text-text-tertiary h-full gap-4 text-center">
+                <FileText size={36} className="opacity-50" />
                 <span className="text-sm">Select a policy to view neural advisory</span>
               </div>
             ) : isLoadingAdvisory ? (
-              <div className="flex items-center justify-center h-full text-[#8A95B0] flex-col gap-4">
-                <RefreshCw size={24} className="animate-spin text-[#00D4FF]" />
+              <div className="flex flex-col items-center justify-center h-full text-text-tertiary gap-4 text-center">
+                <RefreshCw size={28} className="animate-spin text-ai" />
                 <span className="text-sm">Generating advisory via Mixtral-8x7B...</span>
               </div>
             ) : (
-              <div className="animate-in fade-in duration-300 h-full flex flex-col">
-                <div className="flex items-center gap-2 mb-4 text-[#00D4FF]">
-                  <BrainCircuit size={16} />
-                  <span className="font-mono-ibm text-xs font-semibold uppercase tracking-wider">Renewal Strategy Narrative</span>
+              <div className="animate-fade-in flex flex-col h-full w-full">
+                <div className="flex items-center gap-2 mb-6">
+                  <BrainCircuit size={16} className="text-ai" />
+                  <span className="font-semibold text-xs text-ai uppercase tracking-wider">Renewal Strategy Narrative</span>
                 </div>
-                <div className="flex-1 overflow-y-auto text-sm text-[#8A95B0] leading-relaxed space-y-3">
+                <div className="flex-1 overflow-y-auto text-sm text-text-secondary leading-relaxed space-y-4 pr-2">
                    {advisory?.narrative?.split('\n\n').map((para: string, i: number) => (
                      <p key={i}>{para}</p>
                    )) || "System advisory generated but content is empty."}
                 </div>
-                <div className="mt-4 pt-4 border-t border-[#1E2535] flex items-center justify-between">
-                   <div className="text-xs text-[#F0F4FF]">Recommended action logged to CRM auto-mailer.</div>
-                   <button className="nu-btn-primary !px-4 !py-1.5 !text-xs">Execute Email</button>
+                <div className="mt-6 pt-4 border-t border-surface-border flex items-center justify-between">
+                   <div className="text-xs text-text-tertiary">Recommended action logged to CRM auto-mailer.</div>
+                   <Button size="sm">Execute Email</Button>
                 </div>
               </div>
             )}
-          </div>
+          </AICard>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

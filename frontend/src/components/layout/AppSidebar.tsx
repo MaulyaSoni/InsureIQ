@@ -1,300 +1,157 @@
-import { NavLink, useLocation } from "react-router-dom";
+import React, { useState } from "react"
+import { Link, useLocation } from "react-router-dom"
+import { motion, AnimatePresence } from "framer-motion"
+import { useAuth } from "@/lib/auth-context"
 import {
+  Shield,
   LayoutDashboard,
-  FolderOpen,
-  ShieldAlert,
-  TrendingUp,
-  IndianRupee,
   FileText,
+  TrendingUp,
+  BookOpen,
   Layers,
-  ClipboardList,
-  Settings,
+  History,
+  Settings as SettingsIcon,
   LogOut,
+  ChevronRight,
+  ChevronLeft,
+  Search,
+  Bell,
+  Sparkles,
   Zap,
-  Map,
-  Inbox
-} from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
+  AlertCircle
+} from "lucide-react"
+import { cn } from "@/lib/utils"
 
-const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/analytics", icon: Map, label: "Portfolio Heatmap" },
-  { to: "/workbench", icon: Inbox, label: "Review Workbench" },
-  { to: "/policies", icon: FolderOpen, label: "Policies" },
-  { to: "/risk-assessment", icon: ShieldAlert, label: "Risk Assessment" },
-  { to: "/claim-prediction", icon: TrendingUp, label: "Claim Prediction" },
-  { to: "/premium-advisory", icon: IndianRupee, label: "Premium Advisory" },
-  { to: "/fraud-review", icon: ShieldAlert, label: "Fraud Review" },
-  { to: "/reports", icon: FileText, label: "Reports" },
-  { to: "/batch-analysis", icon: Layers, label: "Batch Analysis" },
-  { to: "/audit-log", icon: ClipboardList, label: "Audit Log" },
+const NAV_ITEMS = [
+  { path: '/',              label: 'Dashboard',    icon: LayoutDashboard },
+  { path: '/policies',      label: 'Policies',     icon: FileText },
+  { path: '/risk-assessment', label: 'Risk Engine',  icon: Shield },
+  { path: '/claim-prediction', label: 'Claims',       icon: AlertCircle },
+  { path: '/premium-advisory', label: 'Premium',      icon: TrendingUp },
+  { path: '/reports',       label: 'Reports',      icon: BookOpen },
+  { path: '/batch-analysis', label: 'Batch',        icon: Layers },
+  { path: '/audit-log',     label: 'Audit Log',    icon: History },
 ];
 
-interface AppSidebarProps {
-  onNavigate?: () => void;
-}
-
-export default function AppSidebar({ onNavigate }: AppSidebarProps) {
-  const location = useLocation();
-  const { user, logout } = useAuth();
+export function AppSidebar() {
+  const { user, logout } = useAuth()
+  const location = useLocation()
+  const [isExpanded, setIsExpanded] = useState(true)
 
   return (
-    <aside
-      style={{
-        position: "fixed",
-        left: 0,
-        top: 0,
-        zIndex: 40,
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        width: "240px",
-        backgroundColor: "#0A0C14",
-        borderRight: "1px solid #1E2535",
-      }}
+    <motion.aside
+      animate={{ width: isExpanded ? 240 : 64 }}
+      transition={{ type: "spring", damping: 20, stiffness: 200 }}
+      className="bg-surface-card border-r border-surface-border flex flex-col h-screen shrink-0 relative z-40"
     >
-      {/* Logo */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          padding: "20px 20px 18px",
-          borderBottom: "1px solid #1E2535",
-        }}
-      >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            background: "rgba(0,212,255,0.1)",
-            border: "1px solid rgba(0,212,255,0.25)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <Zap size={18} color="#00D4FF" />
-        </div>
-        <div>
-          <div
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 15,
-              fontWeight: 700,
-              color: "#F0F4FF",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            InsureIQ
+      {/* Brand */}
+      <div className="h-16 flex items-center px-4 border-b border-surface-border overflow-hidden">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-display font-bold shadow-brand shrink-0">
+            I
           </div>
-          <div
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 9,
-              color: "#485068",
-              textTransform: "uppercase",
-              letterSpacing: "0.12em",
-              marginTop: 1,
-            }}
-          >
-            Risk Analytics
-          </div>
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.span
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="font-display font-bold text-lg tracking-tight text-text-primary whitespace-nowrap"
+              >
+                Insure<span className="text-brand-500">IQ</span>
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "12px 8px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 2,
-        }}
-      >
-        {navItems.map((item) => {
-          const isActive =
-            item.to === "/"
-              ? location.pathname === "/"
-              : location.pathname.startsWith(item.to);
-
+      <nav className="flex-1 px-2 py-6 space-y-1 overflow-y-auto scrollbar-thin">
+        {NAV_ITEMS.map((item) => {
+          const isActive = item.path === "/" 
+            ? location.pathname === "/" 
+            : location.pathname.startsWith(item.path);
+            
           return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={onNavigate}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "9px 12px",
-                borderRadius: 6,
-                textDecoration: "none",
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 13,
-                fontWeight: isActive ? 600 : 400,
-                color: isActive ? "#00D4FF" : "#8A95B0",
-                backgroundColor: isActive ? "rgba(0,212,255,0.08)" : "transparent",
-                borderLeft: isActive ? "3px solid #00D4FF" : "3px solid transparent",
-                transition: "all 150ms ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLElement).style.color = "#F0F4FF";
-                  (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.04)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLElement).style.color = "#8A95B0";
-                  (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
-                }
-              }}
-            >
-              <item.icon size={15} style={{ flexShrink: 0 }} />
-              {item.label}
-            </NavLink>
-          );
+            <Link key={item.path} to={item.path}>
+              <motion.div
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors duration-150 group relative',
+                  isActive
+                    ? 'bg-brand-500/10 text-brand-600 dark:text-brand-300'
+                    : 'text-text-secondary hover:bg-surface-raised hover:text-text-primary'
+                )}
+                whileHover={{ x: isExpanded ? 2 : 0 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <item.icon size={18} className={cn(isActive ? 'text-brand-500' : 'text-text-tertiary group-hover:text-text-primary')} />
+                
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="text-sm font-medium whitespace-nowrap overflow-hidden"
+                    >
+                      {item.label}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+
+                {isActive && isExpanded && (
+                  <motion.div
+                    layoutId="active-nav"
+                    className="absolute left-0 top-2 bottom-2 w-1 bg-brand-500 rounded-r-md"
+                  />
+                )}
+              </motion.div>
+            </Link>
+          )
         })}
       </nav>
 
-      {/* Footer */}
-      <div
-        style={{
-          borderTop: "1px solid #1E2535",
-          padding: "12px 8px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-        }}
-      >
-        {/* Agent Active Indicator */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            padding: "7px 12px",
-            borderRadius: 6,
-            backgroundColor: "rgba(0,212,255,0.06)",
-            border: "1px solid rgba(0,212,255,0.12)",
-          }}
+      {/* Toggle & User Section */}
+      <div className="p-2 border-t border-surface-border">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full flex items-center justify-center p-2 rounded-lg text-text-tertiary hover:bg-surface-raised hover:text-text-primary transition-colors mb-2"
         >
-          <div
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              backgroundColor: "#00D4FF",
-              animation: "agentPulse 2s ease-in-out infinite",
-              flexShrink: 0,
-            }}
-          />
-          <span
-            style={{
-              fontFamily: "'Roboto Mono', monospace",
-              fontSize: 10,
-              color: "#00D4FF",
-            }}
-          >
-            AGENT READY
-          </span>
-        </div>
+          {isExpanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+        </button>
 
-        {/* Settings Link */}
-        <NavLink
-          to="/settings"
-          onClick={onNavigate}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "9px 12px",
-            borderRadius: 6,
-            textDecoration: "none",
-            fontFamily: "'DM Sans', sans-serif",
-            fontSize: 13,
-            color: "#485068",
-            borderLeft: "3px solid transparent",
-            transition: "all 150ms ease",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.color = "#8A95B0";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.color = "#485068";
-          }}
-        >
-          <Settings size={15} />
-          Settings
-        </NavLink>
-
-        {/* User */}
-        {user && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "8px 12px",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "#8A95B0",
-                  maxWidth: 140,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {user.name || user.email.split("@")[0]}
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Roboto Mono', monospace",
-                  fontSize: 9,
-                  color: "#485068",
-                  marginTop: 1,
-                }}
-              >
-                {user.email}
-              </div>
-            </div>
-            <button
-              onClick={logout}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "6px",
-                cursor: "pointer",
-                color: "#485068",
-                borderRadius: 4,
-                display: "flex",
-                alignItems: "center",
-                transition: "color 150ms ease",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.color = "#FF3B5C";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.color = "#485068";
-              }}
-              title="Sign out"
-            >
-              <LogOut size={13} />
-            </button>
+        <div className={cn(
+          "flex items-center gap-3 p-2 rounded-xl transition-colors",
+          isExpanded ? "bg-surface-raised/50" : "justify-center"
+        )}>
+          <div className="w-8 h-8 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center font-bold text-xs shrink-0 border border-brand-500/20 uppercase">
+            {user?.full_name?.charAt(0) || "A"}
           </div>
-        )}
+          
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: 'auto' }}
+                exit={{ opacity: 0, width: 0 }}
+                className="overflow-hidden flex-1"
+              >
+                <div className="text-xs font-semibold text-text-primary truncate">{user?.full_name || "Analyst"}</div>
+                <div className="text-[10px] text-text-tertiary font-mono-code truncate tracking-tighter">ID: {user?.id?.substring(0, 8)}</div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {isExpanded && (
+            <button 
+              onClick={logout}
+              className="p-1.5 text-text-tertiary hover:text-risk-critical transition-colors"
+            >
+              <LogOut size={14} />
+            </button>
+          )}
+        </div>
       </div>
-    </aside>
-  );
+    </motion.aside>
+  )
 }

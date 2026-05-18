@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { Zap, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export default function Signup() {
   const [name, setName] = useState("");
@@ -37,114 +39,39 @@ export default function Signup() {
   ];
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#07080D",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
       {/* Grid bg */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: 600,
-          height: 600,
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(0,102,255,0.07) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(83,74,183,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(83,74,183,0.03)_1px,transparent_1px)] bg-[size:48px_48px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(83,74,183,0.07)_0%,transparent_70%)] pointer-events-none" />
 
-      <div style={{ width: "100%", maxWidth: 480, position: "relative", zIndex: 1 }}>
+      <div className="w-full max-w-[480px] relative z-10">
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 52,
-              height: 52,
-              borderRadius: 12,
-              background: "rgba(0,212,255,0.1)",
-              border: "1px solid rgba(0,212,255,0.25)",
-              marginBottom: 16,
-            }}
-          >
-            <Zap size={24} color="#00D4FF" />
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-brand-500/10 border border-brand-500/20 mb-4">
+            <Zap size={28} className="text-brand-500" />
           </div>
-          <div
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 26,
-              fontWeight: 700,
-              color: "#F0F4FF",
-              letterSpacing: "-0.02em",
-            }}
-          >
+          <div className="font-mono-code text-3xl font-bold text-text-primary tracking-tight">
             InsureIQ
           </div>
-          <div
-            style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: 14,
-              color: "#8A95B0",
-              marginTop: 6,
-            }}
-          >
+          <div className="text-sm text-text-secondary mt-2">
             Create Your Enterprise Account
           </div>
         </div>
 
         {/* Card */}
-        <div
-          style={{
-            backgroundColor: "#0E1118",
-            border: "1px solid #1E2535",
-            borderRadius: 12,
-            padding: "36px 32px",
-            boxShadow: "0 8px 40px rgba(0,0,0,0.4)",
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 15,
-              fontWeight: 600,
-              color: "#F0F4FF",
-              marginBottom: 24,
-            }}
-          >
+        <Card className="p-8 shadow-2xl shadow-black/40 border-surface-border-strong">
+          <div className="font-mono-code text-base font-semibold text-text-primary mb-6">
             Request Access
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             {/* Name */}
-            <div>
-              <label className="nu-label" htmlFor="name">Full Name</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-tertiary" htmlFor="name">Full Name</label>
               <input
                 id="name"
                 type="text"
-                className="nu-input"
+                className="w-full bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg px-4 py-3 focus:outline-none focus:border-brand-500 transition-colors"
                 placeholder="John Smith"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -153,12 +80,12 @@ export default function Signup() {
             </div>
 
             {/* Email */}
-            <div>
-              <label className="nu-label" htmlFor="email">Work Email</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-tertiary" htmlFor="email">Work Email</label>
               <input
                 id="email"
                 type="email"
-                className="nu-input"
+                className="w-full bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg px-4 py-3 focus:outline-none focus:border-brand-500 transition-colors"
                 placeholder="john@icici-lombard.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -167,12 +94,12 @@ export default function Signup() {
             </div>
 
             {/* Company */}
-            <div>
-              <label className="nu-label" htmlFor="company">Organization</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-tertiary" htmlFor="company">Organization</label>
               <input
                 id="company"
                 type="text"
-                className="nu-input"
+                className="w-full bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg px-4 py-3 focus:outline-none focus:border-brand-500 transition-colors"
                 placeholder="ICICI Lombard"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
@@ -180,11 +107,11 @@ export default function Signup() {
             </div>
 
             {/* Role */}
-            <div>
-              <label className="nu-label" htmlFor="role">Role</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-tertiary" htmlFor="role">Role</label>
               <select
                 id="role"
-                className="nu-select"
+                className="w-full bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg px-4 py-3 focus:outline-none focus:border-brand-500 transition-colors appearance-none"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
               >
@@ -197,102 +124,69 @@ export default function Signup() {
             </div>
 
             {/* Password */}
-            <div>
-              <label className="nu-label" htmlFor="password">Password</label>
-              <div style={{ position: "relative" }}>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-tertiary" htmlFor="password">Password</label>
+              <div className="relative">
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  className="nu-input"
+                  className="w-full bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg px-4 py-3 pr-12 focus:outline-none focus:border-brand-500 transition-colors"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  style={{ paddingRight: 44 }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: "absolute",
-                    right: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#485068",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary transition-colors focus:outline-none"
                 >
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
-              className="nu-btn-primary"
               disabled={loading}
-              style={{ width: "100%", justifyContent: "center", marginTop: 4, height: 48, fontSize: 14 }}
+              className="w-full mt-2 h-12 text-base font-semibold"
             >
               {loading ? (
                 <>
-                  <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                  <Loader2 size={18} className="animate-spin mr-2" />
                   Creating account...
                 </>
               ) : (
                 "Create Account →"
               )}
-            </button>
+            </Button>
           </form>
 
-          <hr className="nu-divider" style={{ margin: "24px 0" }} />
+          <div className="h-px w-full bg-surface-border my-8" />
 
           {/* Trust badges in card */}
-          <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+          <div className="flex justify-center gap-4 flex-wrap mb-6">
             {["IRDAI Compliant", "256-bit TLS", "SOC 2 Ready"].map((badge) => (
               <div
                 key={badge}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  backgroundColor: "rgba(0,212,255,0.05)",
-                  border: "1px solid rgba(0,212,255,0.15)",
-                  borderRadius: 20,
-                  padding: "4px 10px",
-                  fontFamily: "'IBM Plex Mono', monospace",
-                  fontSize: 9,
-                  color: "#485068",
-                }}
+                className="flex items-center gap-1.5 bg-brand-500/5 border border-brand-500/10 rounded-full px-3 py-1 font-mono-code text-[10px] text-text-secondary"
               >
-                <ShieldCheck size={10} color="#00D4FF" />
+                <ShieldCheck size={12} className="text-brand-500" />
                 {badge}
               </div>
             ))}
           </div>
 
-          <p
-            style={{
-              textAlign: "center",
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: 13,
-              color: "#485068",
-            }}
-          >
+          <p className="text-center text-sm text-text-secondary">
             Already have an account?{" "}
             <Link
               to="/login"
-              style={{ color: "#00D4FF", textDecoration: "none", fontWeight: 500 }}
-              onMouseEnter={(e) => ((e.target as HTMLElement).style.textDecoration = "underline")}
-              onMouseLeave={(e) => ((e.target as HTMLElement).style.textDecoration = "none")}
+              className="text-brand-500 font-semibold hover:underline"
             >
               Sign In
             </Link>
           </p>
-        </div>
+        </Card>
       </div>
     </div>
   );

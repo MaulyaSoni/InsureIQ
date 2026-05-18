@@ -7,13 +7,16 @@ import {
   Database,
   Lock,
   Globe,
-  Bell,
   RefreshCw,
   Save,
   Trash2,
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<"api" | "model" | "policy" | "security" | "team">("team");
@@ -36,55 +39,41 @@ export default function Settings() {
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <h1 className="nu-page-title">Intelligence Console</h1>
-          <div className="nu-page-subtitle">Configure system-wide neural parameters and API connectivity</div>
-        </div>
-        <button 
-          className="nu-btn-primary" 
-          onClick={handleSave}
-          disabled={saving}
-          style={{ width: 140, justifyContent: "center" }}
-        >
-          {saving ? <RefreshCw className="animate-spin" size={16} /> : <Save size={16} />}
-          {saving ? "Hashing..." : "Save Configuration"}
-        </button>
-      </div>
+    <div className="flex flex-col gap-6 animate-fade-in pb-12">
+      <PageHeader
+        title="Intelligence Console"
+        subtitle="Configure system-wide neural parameters and API connectivity"
+        actions={
+          <Button 
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? <RefreshCw className="animate-spin mr-2" size={16} /> : <Save className="mr-2" size={16} />}
+            {saving ? "Hashing..." : "Save Configuration"}
+          </Button>
+        }
+      />
 
-      <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 32, alignItems: "start" }}>
+      <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] lg:grid-cols-[300px_1fr] gap-8 items-start">
         {/* Left Side: Category Navigator */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id as any)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "14px 20px",
-                borderRadius: 8,
-                backgroundColor: activeTab === t.id ? "rgba(0, 212, 255, 0.08)" : "transparent",
-                color: activeTab === t.id ? "#00D4FF" : "#8A95B0",
-                border: activeTab === t.id ? "1px solid rgba(0, 212, 255, 0.2)" : "1px solid transparent",
-                textAlign: "left",
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 14,
-                fontWeight: activeTab === t.id ? 700 : 400,
-                cursor: "pointer",
-                transition: "all 150ms ease",
-              }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm transition-all duration-200 ${
+                activeTab === t.id 
+                  ? "bg-brand-500/10 text-brand-500 font-semibold border border-brand-500/20" 
+                  : "text-text-secondary hover:bg-surface-raised hover:text-text-primary border border-transparent font-medium"
+              }`}
             >
-              <t.icon size={16} />
+              <t.icon size={18} />
               {t.name}
             </button>
           ))}
 
-          <div style={{ padding: "32px 20px" }}>
-            <div className="font-mono-ibm" style={{ fontSize: 11, color: "#485068", borderTop: "1px solid #1E2535", paddingTop: 16 }}>
+          <div className="p-5 mt-4">
+            <div className="font-mono-code text-xs text-text-tertiary border-t border-surface-border pt-4 leading-relaxed">
               System v2.4.1 (Stable)<br />
               Environment: Production-Mumbai<br />
               IRDAI Compliance: ACTIVE
@@ -93,56 +82,58 @@ export default function Settings() {
         </div>
 
         {/* Right Side: Configuration Blocks */}
-        <div className="nu-card" style={{ padding: 32, display: "flex", flexDirection: "column", gap: 32 }}>
+        <Card className="p-8">
           {activeTab === "team" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div className="flex flex-col gap-8">
               <div>
-                <h3 className="font-mono-ibm text-[15px] font-semibold text-[#F0F4FF] mb-2">Team Management</h3>
-                <p className="nu-muted mb-6">Manage organization members and role-based access control.</p>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 24 }}>
-                  <div style={{ flex: 1 }}>
-                    <label className="nu-label">Email Address</label>
-                    <input type="email" className="nu-input" placeholder="colleague@suresafe.in" />
+                <h3 className="font-semibold text-lg text-text-primary mb-2">Team Management</h3>
+                <p className="text-sm text-text-secondary mb-6">Manage organization members and role-based access control.</p>
+                <div className="flex flex-col sm:flex-row items-end gap-3 mb-8">
+                  <div className="flex-1 w-full">
+                    <label className="text-xs uppercase tracking-wider text-text-tertiary font-semibold mb-2 block">Email Address</label>
+                    <input type="email" className="w-full bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg px-3 py-2.5 focus:outline-none focus:border-brand-500" placeholder="colleague@suresafe.in" />
                   </div>
-                  <div style={{ width: 140 }}>
-                    <label className="nu-label">Role</label>
-                    <select className="nu-select">
+                  <div className="w-full sm:w-[140px]">
+                    <label className="text-xs uppercase tracking-wider text-text-tertiary font-semibold mb-2 block">Role</label>
+                    <select className="w-full bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg px-3 py-2.5 focus:outline-none focus:border-brand-500">
                       <option value="VIEWER">VIEWER</option>
                       <option value="ANALYST">ANALYST</option>
                       <option value="MANAGER">MANAGER</option>
                       <option value="ADMIN">ADMIN</option>
                     </select>
                   </div>
-                  <button className="nu-btn-primary" onClick={() => toast.success("Invitation sent with temporary credentials.")}>Invite User</button>
+                  <Button onClick={() => toast.success("Invitation sent with temporary credentials.")} className="w-full sm:w-auto mt-4 sm:mt-0">Invite User</Button>
                 </div>
                 
-                <div style={{ border: "1px solid rgba(255,255,255,0.05)", borderRadius: 8, overflow: "hidden" }}>
-                  <table style={{ width: "100%", textAlign: "left", borderCollapse: "collapse" }}>
+                <div className="border border-surface-border rounded-lg overflow-hidden">
+                  <table className="w-full text-left border-collapse text-sm">
                     <thead>
-                      <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", backgroundColor: "rgba(0,0,0,0.2)", fontSize: 12 }}>
-                        <th style={{ padding: "12px 16px", color: "#8A95B0", fontWeight: 500 }}>User</th>
-                        <th style={{ padding: "12px 16px", color: "#8A95B0", fontWeight: 500 }}>Role</th>
-                        <th style={{ padding: "12px 16px", color: "#8A95B0", fontWeight: 500 }}>Status</th>
+                      <tr className="border-b border-surface-border bg-surface-raised/50">
+                        <th className="px-4 py-3 font-medium text-text-tertiary uppercase tracking-wider text-xs">User</th>
+                        <th className="px-4 py-3 font-medium text-text-tertiary uppercase tracking-wider text-xs">Role</th>
+                        <th className="px-4 py-3 font-medium text-text-tertiary uppercase tracking-wider text-xs">Status</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ padding: "16px", color: "#F0F4FF", fontSize: 13, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                           admin@suresafe.in<br/><span style={{ color: "#485068", fontSize: 11 }}>Admin User</span>
+                    <tbody className="divide-y divide-surface-border text-text-primary">
+                      <tr className="hover:bg-surface-raised transition-colors">
+                        <td className="px-4 py-3">
+                           <div className="font-medium text-sm">admin@suresafe.in</div>
+                           <div className="text-xs text-text-tertiary">Admin User</div>
                         </td>
-                        <td style={{ padding: "16px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                           <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, backgroundColor: "rgba(0, 212, 255, 0.1)", color: "#00D4FF", border: "1px solid rgba(0, 212, 255, 0.2)"}}>ADMIN</span>
+                        <td className="px-4 py-3">
+                           <Badge variant="low" size="sm">ADMIN</Badge>
                         </td>
-                        <td style={{ padding: "16px", color: "#00E676", fontSize: 12, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>Active</td>
+                        <td className="px-4 py-3 text-success text-xs font-semibold">Active</td>
                       </tr>
-                      <tr>
-                        <td style={{ padding: "16px", color: "#F0F4FF", fontSize: 13, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                           analyst@suresafe.in<br/><span style={{ color: "#485068", fontSize: 11 }}>Senior Analyst</span>
+                      <tr className="hover:bg-surface-raised transition-colors">
+                        <td className="px-4 py-3">
+                           <div className="font-medium text-sm">analyst@suresafe.in</div>
+                           <div className="text-xs text-text-tertiary">Senior Analyst</div>
                         </td>
-                        <td style={{ padding: "16px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                           <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, backgroundColor: "rgba(255, 255, 255, 0.05)", color: "#8A95B0", border: "1px solid rgba(255, 255, 255, 0.1)"}}>ANALYST</span>
+                        <td className="px-4 py-3">
+                           <Badge variant="default" size="sm">ANALYST</Badge>
                         </td>
-                        <td style={{ padding: "16px", color: "#00E676", fontSize: 12, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>Active</td>
+                        <td className="px-4 py-3 text-success text-xs font-semibold">Active</td>
                       </tr>
                     </tbody>
                   </table>
@@ -152,71 +143,63 @@ export default function Settings() {
           )}
 
           {activeTab === "api" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label className="nu-label">Main Backend Core Endpoint</label>
-                <div style={{ position: "relative" }}>
-                  <Globe size={14} color="#485068" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-                  <input type="text" className="nu-input" style={{ paddingLeft: 40 }} defaultValue="https://api.insureiq.internal/v2" />
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs uppercase tracking-wider text-text-tertiary font-semibold">Main Backend Core Endpoint</label>
+                <div className="relative">
+                  <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                  <input type="text" className="w-full bg-surface-raised border border-surface-border rounded-lg pl-10 pr-3 py-2 text-sm text-text-primary focus:outline-none focus:border-brand-500" defaultValue="https://api.insureiq.internal/v2" />
                 </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label className="nu-label">External Risk Oracle (XOR)</label>
-                <input type="text" className="nu-input" defaultValue="https://xor.internal.mumbai.gov.in" />
-                <span style={{ fontSize: 10, color: "#485068" }}>Last synced 2.4 min ago · Latency: 14ms</span>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs uppercase tracking-wider text-text-tertiary font-semibold">External Risk Oracle (XOR)</label>
+                <input type="text" className="w-full bg-surface-raised border border-surface-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-brand-500" defaultValue="https://xor.internal.mumbai.gov.in" />
+                <span className="text-xs text-text-tertiary font-mono-code">Last synced 2.4 min ago · Latency: 14ms</span>
               </div>
-              <div className="nu-divider" />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <div className="font-mono-ibm" style={{ fontSize: 13, color: "#F0F4FF" }}>Auto-Stream Evaluation</div>
-                  <div className="nu-muted" style={{ fontSize: 11 }}>Trigger assessment pipeline automatically upon ingest.</div>
+              <div className="h-px w-full bg-surface-border my-2" />
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-1">
+                  <div className="font-semibold text-text-primary text-sm">Auto-Stream Evaluation</div>
+                  <div className="text-xs text-text-secondary">Trigger assessment pipeline automatically upon ingest.</div>
                 </div>
-                <div style={{ width: 44, height: 22, borderRadius: 20, backgroundColor: "#00D4FF", position: "relative", cursor: "pointer", marginLeft: "auto" }}>
-                  <div style={{ width: 16, height: 16, borderRadius: "50%", backgroundColor: "#FFF", position: "absolute", top: 3, right: 3 }} />
+                <div className="w-11 h-6 rounded-full bg-brand-500 relative cursor-pointer">
+                  <div className="w-4 h-4 rounded-full bg-white absolute top-1 right-1" />
                 </div>
               </div>
             </div>
           )}
 
           {activeTab === "model" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <label className="nu-label">Active Underwriting Model Node</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="flex flex-col gap-8">
+              <div className="flex flex-col gap-4">
+                <label className="text-xs uppercase tracking-wider text-text-tertiary font-semibold">Active Underwriting Model Node</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
-                    { id: "llama-3.1-8b", name: "llama-3.1-8b", tag: "Fast / Efficient", color: "#8A95B0" },
-                    { id: "llama-3.3-70b", name: "llama-3.3-70b", tag: "Most Intelligent", color: "#00D4FF", active: true },
-                    { id: "gpt-4o", name: "GPT-4o", tag: "External Enterprise", color: "#CC74FF" },
-                    { id: "ensemble", name: "Ensemble-V3", tag: "Multi-Model Voting", color: "#00E676" },
+                    { id: "llama-3.1-8b", name: "llama-3.1-8b", tag: "Fast / Efficient", color: "bg-text-tertiary" },
+                    { id: "llama-3.3-70b", name: "llama-3.3-70b", tag: "Most Intelligent", color: "bg-ai", active: true },
+                    { id: "gpt-4o", name: "GPT-4o", tag: "External Enterprise", color: "bg-purple-500" },
+                    { id: "ensemble", name: "Ensemble-V3", tag: "Multi-Model Voting", color: "bg-success" },
                   ].map(m => (
                     <div 
                       key={m.id} 
-                      style={{ 
-                        padding: 16, 
-                        border: m.active ? "1px solid #00D4FF" : "1px solid #1E2535", 
-                        backgroundColor: m.active ? "rgba(0, 212, 255, 0.05)" : "#0E1118",
-                        borderRadius: 8,
-                        cursor: "pointer",
-                        transition: "all 150ms ease",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12
-                      }}
+                      className={`p-4 border rounded-lg cursor-pointer transition-all flex items-center gap-3 ${
+                        m.active ? "border-ai bg-ai/5" : "border-surface-border bg-surface-raised"
+                      }`}
                     >
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: m.color }} />
-                      <div style={{ flex: 1 }}>
-                        <div className="font-mono-ibm" style={{ fontSize: 13, color: "#F0F4FF", fontWeight: 600 }}>{m.name}</div>
-                        <div className="nu-muted" style={{ fontSize: 10 }}>{m.tag}</div>
+                      <div className={`w-2 h-2 rounded-full ${m.color}`} />
+                      <div className="flex-1">
+                        <div className="font-mono-code text-sm text-text-primary font-semibold">{m.name}</div>
+                        <div className="text-xs text-text-secondary">{m.tag}</div>
                       </div>
-                      {m.active && <Zap size={14} color="#00D4FF" fill="#00D4FF" />}
+                      {m.active && <Zap size={16} className="text-ai" />}
                     </div>
                   ))}
                 </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label className="nu-label">Reasoning Chain-of-Thought Temperature</label>
-                <input type="range" style={{ accentColor: "#00D4FF" }} min="1" max="100" defaultValue="42" />
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#485068" }}>
+              <div className="flex flex-col gap-4">
+                <label className="text-xs uppercase tracking-wider text-text-tertiary font-semibold">Reasoning Chain-of-Thought Temperature</label>
+                <input type="range" className="w-full accent-ai" min="1" max="100" defaultValue="42" />
+                <div className="flex justify-between text-xs text-text-tertiary font-mono-code">
                   <span>Precise (0.1)</span>
                   <span>Neural Standard (0.42)</span>
                   <span>Creative (0.9+)</span>
@@ -226,50 +209,52 @@ export default function Settings() {
           )}
 
           {activeTab === "policy" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label className="nu-label">Critical Severity Threshold</label>
-                <div className="nu-mono-value" style={{ fontSize: 15, color: "#FF3B5C", marginBottom: 8 }}>85.0 +</div>
-                <input type="range" style={{ accentColor: "#FF3B5C" }} min="50" max="95" defaultValue="85" />
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4">
+                <label className="text-xs uppercase tracking-wider text-text-tertiary font-semibold">Critical Severity Threshold</label>
+                <div className="font-mono-code text-lg text-error font-bold block mb-2">85.0 +</div>
+                <input type="range" className="w-full accent-error" min="50" max="95" defaultValue="85" />
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, backgroundColor: "rgba(255, 179, 0, 0.05)", border: "1px solid rgba(255, 179, 0, 0.15)", borderRadius: 6 }}>
-                <AlertTriangle size={14} color="#FFB300" />
-                <span className="nu-muted" style={{ fontSize: 11, lineHeight: 1.4 }}>Modifying these thresholds will re-classify all active policies in the next nightly batch run.</span>
+              <div className="flex items-center gap-3 p-4 bg-warning/10 border border-warning/30 rounded-lg">
+                <AlertTriangle size={18} className="text-warning shrink-0" />
+                <span className="text-sm text-text-primary leading-snug">Modifying these thresholds will re-classify all active policies in the next nightly batch run.</span>
               </div>
-              <div className="nu-divider" />
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <label className="nu-label">Mandatory Report Sections</label>
-                {[
-                  { id: "risk", label: "SHAP Factor Attribution", active: true },
-                  { id: "prem", label: "Multi-insurer Benchmarks", active: true },
-                  { id: "auth", label: "Sign-off Metadata Block", active: false },
-                ].map(s => (
-                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <input type="checkbox" id={s.id} defaultChecked={s.active} />
-                    <label htmlFor={s.id} style={{ fontSize: 13, color: "#8A95B0" }}>{s.label}</label>
-                  </div>
-                ))}
+              <div className="h-px w-full bg-surface-border my-2" />
+              <div className="flex flex-col gap-4">
+                <label className="text-xs uppercase tracking-wider text-text-tertiary font-semibold">Mandatory Report Sections</label>
+                <div className="flex flex-col gap-3">
+                  {[
+                    { id: "risk", label: "SHAP Factor Attribution", active: true },
+                    { id: "prem", label: "Multi-insurer Benchmarks", active: true },
+                    { id: "auth", label: "Sign-off Metadata Block", active: false },
+                  ].map(s => (
+                    <div key={s.id} className="flex items-center gap-3">
+                      <input type="checkbox" id={s.id} defaultChecked={s.active} className="w-4 h-4 rounded bg-surface-raised border-surface-border text-brand-500 focus:ring-brand-500" />
+                      <label htmlFor={s.id} className="text-sm text-text-primary cursor-pointer">{s.label}</label>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
 
           {activeTab === "security" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label className="nu-label">Session Rotation Frequency</label>
-                <select className="nu-select">
+            <div className="flex flex-col gap-8">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs uppercase tracking-wider text-text-tertiary font-semibold">Session Rotation Frequency</label>
+                <select className="w-full bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg px-3 py-2.5 outline-none focus:border-brand-500">
                   <option>Every 24 Hours</option>
                   <option>Every 12 Hours</option>
                   <option>IRDAI Compliant (Real-time)</option>
                 </select>
               </div>
-              <div className="nu-divider" />
-              <button className="nu-btn-ghost" style={{ width: "fit-content", borderColor: "#FF3B5C", color: "#FF3B5C" }}>
-                <Trash2 size={14} /> Clear System Audit Hashing
-              </button>
+              <div className="h-px w-full bg-surface-border" />
+              <Button variant="outline" className="w-fit border-error text-error hover:bg-error/10">
+                <Trash2 size={16} className="mr-2" /> Clear System Audit Hashing
+              </Button>
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

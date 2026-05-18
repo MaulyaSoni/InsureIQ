@@ -12,6 +12,10 @@ try:
 except Exception:
     ChatGroq = None
 
+from groq import Groq
+
+groq_client = Groq(api_key=get_settings().groq_api_key)
+
 from langchain_core.messages import HumanMessage, SystemMessage
 
 GROQ_MODELS = {
@@ -37,7 +41,7 @@ def _build_messages(system_prompt: str, user_content: str) -> list[dict[str, str
 def _fallback_text(model_key: str, user_content: str) -> str:
     if model_key == "router":
         return "full_report"
-    return f"[LLM fallback] Groq unavailable. Input: {user_content[:100]}"
+    raise Exception(f"Groq unavailable for {model_key}")
 
 
 class RateLimitError(Exception):
@@ -67,12 +71,16 @@ def invoke_llm(
             )
 
             if expect_json:
-                parsed = llm.with_structured_output(dict).invoke(messages)
-                if isinstance(parsed, str):
-                    return parsed
-                if hasattr(parsed, "model_dump_json"):
-                    return parsed.model_dump_json()
-                return json.dumps(parsed)
+                response = llm.invoke(messages)
+                content = getattr(response, "content", "") or ""
+                if not content:
+                    return "{}"
+                # Prefer valid JSON output; fallback to wrapping raw text.
+                try:
+                    parsed = json.loads(content)
+                    return json.dumps(parsed)
+                except Exception:
+                    return json.dumps({"raw": content})
 
             response = llm.invoke(messages)
             content = getattr(response, "content", "") or ""
@@ -133,3 +141,47 @@ def invoke_with_retry(model_key: str, messages: list[dict[str, str]], response_f
             return _fallback_text(model_key, messages[-1].get("content", "") if messages else "")
 
     return _fallback_text(model_key, messages[-1].get("content", "") if messages else "")
+
+from typing import Generator
+
+def invoke_llm_streaming(
+    model_key: str,
+    system_prompt: str,
+    user_content: str,
+) -> Generator[str, None, None]:
+    model = GROQ_MODELS[model_key]
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": user_content})
+
+    try:
+        stream = groq_client.chat.completions.create(
+            model=model,
+            messages=messages,
+            stream=True,
+            max_tokens=2048,
+            temperature=0.1,
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta and delta.content:
+                yield delta.content
+    except Exception as e:
+        err_str = str(e).lower()
+        if "429" in err_str or "rate_limit" in err_str:
+            import time
+            time.sleep(60)
+            stream = groq_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+                max_tokens=2048,
+                temperature=0.1,
+            )
+            for chunk in stream:
+                delta = chunk.choices[0].delta
+                if delta and delta.content:
+                    yield delta.content
+        else:
+            raise

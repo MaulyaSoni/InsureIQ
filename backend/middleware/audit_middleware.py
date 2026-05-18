@@ -13,6 +13,14 @@ logger = logging.getLogger("insureiq.audit")
 
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+        # Avoid request-body interception on streaming endpoints.
+        # BaseHTTPMiddleware + wrapped receive can break SSE disconnect handling.
+        if request.url.path.endswith("/stream"):
+            return await call_next(request)
+
+        if request.method not in {"POST", "PUT", "DELETE"}:
+            return await call_next(request)
+
         body_bytes = await request.body()
 
         async def receive():
@@ -20,9 +28,6 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         request._receive = receive
         response = await call_next(request)
-
-        if request.method not in {"POST", "PUT", "DELETE"}:
-            return response
 
         try:
             payload_hash = hashlib.sha256(body_bytes or b"").hexdigest() if body_bytes else None
@@ -34,7 +39,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             if resource_id and resource_id in {"import-csv", "sample-csv"}:
                 resource_type = "policies"
                 resource_id = None
-            uid = try_get_user_id_from_auth_header(request.headers.get("Authorization"))
+            uid = try_get_user_id_from_auth_header(request)
             client = request.client
             ip_address = client.host if client else None
             audit_status = AuditStatus.success if response.status_code < 400 else AuditStatus.failure

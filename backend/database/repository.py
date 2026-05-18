@@ -309,3 +309,7 @@ class LLMCacheRepository:
     def invalidate(db: Session, cache_key: str):
         db.query(LLMCache).filter(LLMCache.cache_key == cache_key).delete()
         db.commit()
+
+
+def get_policy(db: Session, policy_id: str, user_id: str) -> Policy | None:
+    return PolicyRepository.get_by_id(db, policy_id, user_id)

@@ -1,0 +1,19 @@
+{
+  "todos": [
+    {
+      "content": "Identify missing get_policy function in repository",
+      "status": "in_progress",
+      "priority": "high"
+    },
+    {
+      "content": "Implement get_policy in backend.database.repository",
+      "status": "pending",
+      "priority": "high"
+    },
+    {
+      "content": "Verify import in policies.py resolves correctly",
+      "status": "pending",
+      "priority": "medium"
+    }
+  ]
+}

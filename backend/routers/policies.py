@@ -455,3 +455,128 @@ def run_all_analysis(
             "content": final_state.get("final_report"),
         },
     }
+
+
+import asyncio
+import json
+import time
+from typing import AsyncGenerator
+from fastapi.responses import StreamingResponse
+from backend.database.repository import get_policy
+
+_trace_queues = {}
+
+def emit_trace_event(session_id: str, event_type: str, data: dict):
+    queue = _trace_queues.get(session_id)
+    if queue:
+        try:
+            queue.put_nowait({"event": event_type, "data": data})
+        except asyncio.QueueFull:
+            pass
+
+async def sse_generator(queue, timeout=60.0) -> AsyncGenerator[str, None]:
+    start = time.time()
+    while True:
+        if time.time() - start > timeout:
+            yield "event: timeout\ndata: {}\n\n"
+            break
+        try:
+            event = await asyncio.wait_for(queue.get(), timeout=0.5)
+            event_type = event["event"]
+            data = json.dumps(event["data"])
+            yield f"event: {event_type}\ndata: {data}\n\n"
+            if event_type in ["complete", "error"]:
+                break
+        except asyncio.TimeoutError:
+            yield ": keepalive\n\n"
+        except Exception:
+            break
+
+@router.post("/{policy_id}/run-all/stream")
+async def run_all_stream(policy_id: str, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    policy = get_policy(db, str(policy_id), str(current_user.id))
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    
+    session_id = f"{current_user.id}:{policy_id}"
+    queue = asyncio.Queue(maxsize=100)
+    _trace_queues[session_id] = queue
+
+    policy_dict = {}
+    for c in policy.__table__.columns:
+        v = getattr(policy, c.name)
+        policy_dict[c.name] = v.isoformat() if hasattr(v, 'isoformat') else v
+
+    initial_state = {
+        "policy_id": str(policy_id),
+        "policy_data": policy_dict,
+        "user_query": "full_report",
+        "route": None,
+        "claim_probability": None,
+        "risk_score": None,
+        "risk_band": None,
+        "shap_features": None,
+        "risk_explanation": None,
+        "premium_min": None,
+        "premium_max": None,
+        "premium_narrative": None,
+        "adjustment_factors": None,
+        "final_report": None,
+        "report_id": None,
+        "retrieved_context": None,
+        "error": None,
+        "messages": [],
+        "session_id": session_id,
+        "_trace_session_id": session_id,
+        "_app": request.app,
+        "_db": db,
+        "_user_id": current_user.id,
+        "_policy": policy,
+    }
+
+    async def run_graph_async():
+        loop = asyncio.get_event_loop()
+        try:
+            from backend.agents.graph import insureiq_graph
+            result = await loop.run_in_executor(None, lambda: insureiq_graph.invoke(initial_state))
+
+            # Save prediction to DB
+            if result.get("risk_score") is not None:
+                from backend.database.repository import create_prediction
+                prediction = create_prediction(db, {
+                    "policy_id": str(policy_id),
+                    "user_id": str(current_user.id),
+                    "claim_probability": result.get("claim_probability"),
+                    "risk_score": result.get("risk_score"),
+                    "risk_band": result.get("risk_band"),
+                    "shap_features": json.dumps(result.get("shap_features") or []),
+                    "llm_explanation": result.get("risk_explanation"),
+                    "model_version": "xgb_v1",
+                })
+
+            await queue.put({
+                "event": "complete",
+                "data": {
+                    "risk_score": result.get("risk_score"),
+                    "risk_band": result.get("risk_band"),
+                    "claim_probability": result.get("claim_probability"),
+                    "premium_min": result.get("premium_min"),
+                    "premium_max": result.get("premium_max"),
+                    "risk_explanation": result.get("risk_explanation"),
+                    "report_id": result.get("report_id"),
+                }
+            })
+        except Exception as e:
+            await queue.put({"event": "error", "data": {"message": str(e)[:300]}})
+
+    asyncio.create_task(run_graph_async())
+
+    return StreamingResponse(
+        sse_generator(queue),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )

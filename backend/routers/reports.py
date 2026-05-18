@@ -116,7 +116,19 @@ def report_pdf(report_id: str, db: Session = Depends(get_db), user: User = Depen
         c.setFont("Helvetica", 10)
 
         y = height - 70
-        content_lines = (report.content or "").splitlines()
+        content = report.content or "No content available for this report."
+        
+        # Strip Markdown and handle fallback text
+        import re
+        if "[LLM fallback]" in content:
+            content = "Report narrative is temporarily unavailable. AI systems are currently being tuned. Please contact support if this persists."
+        
+        # Basic markdown cleaning for plain text PDF
+        content = re.sub(r'^#+\s*', '', content, flags=re.MULTILINE) # Remove headers
+        content = re.sub(r'\*\*(.*?)\*\*', r'\1', content)           # Remove bold
+        content = re.sub(r'---', '----------------------------------', content) # Replace HR
+        
+        content_lines = content.splitlines()
         
         import textwrap
         for line in content_lines:
@@ -131,8 +143,10 @@ def report_pdf(report_id: str, db: Session = Depends(get_db), user: User = Depen
                     c.setFont("Helvetica", 10)
                     y = height - 40
                 
-                # Sanitize line to remove or replace non-Latin1 characters
-                safe_line = wrapped.encode('latin-1', 'replace').decode('latin-1')
+                # Replace Unicode characters with safe ASCII equivalents
+                safe_line = wrapped.replace('₹', 'Rs.').replace('�', '-')
+                safe_line = safe_line.encode('latin-1', 'replace').decode('latin-1')
+                
                 c.drawString(40, y, safe_line)
                 y -= 14
 

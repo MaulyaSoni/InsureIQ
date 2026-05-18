@@ -1,21 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  ClipboardList,
   Search,
-  Filter,
   Download,
   ShieldCheck,
-  ShieldAlert,
   Zap,
-  Info,
-  ChevronRight,
-  Clock,
   User,
   Bot,
   RefreshCw,
 } from "lucide-react";
 import { getAuditLog } from "@/lib/api";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 const AUDIT_DATA = [
   { id: "LOG-9283", user: "Vikram Singh", event: "Generated Intelligence Report (RPT-0834)", policy: "IQ-00247", time: "2 min ago", role: "Manager", type: "ACTION" },
@@ -32,14 +29,12 @@ export default function AuditLog() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchLogs = async () => {
     try {
       const data = await getAuditLog(1, 100);
       setLogs(data);
-      setLastRefresh(new Date());
     } catch (err) {
       console.error("Failed to fetch audit logs:", err);
     }
@@ -72,63 +67,51 @@ export default function AuditLog() {
       );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <h1 className="nu-page-title">Compliance Audit Log</h1>
-          <div className="nu-page-subtitle">Immutable chronological trail of all human and neural agent activity</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span className="nu-muted" style={{ fontSize: 11 }}>Auto-refreshing every 5s</span>
-          <button 
-            className="nu-btn-ghost" 
-            style={{ display: "flex", alignItems: "center", gap: 8 }}
-            onClick={handleManualRefresh}
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Refresh
-          </button>
-          <button className="nu-btn-ghost" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Download size={14} />
-            Export
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6 animate-fade-in pb-12">
+      <PageHeader
+        title="Compliance Audit Log"
+        subtitle="Immutable chronological trail of all human and neural agent activity"
+        actions={
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-text-tertiary">Auto-refreshing every 5s</span>
+            <Button variant="outline" size="sm" onClick={handleManualRefresh}>
+              <RefreshCw size={14} className={`mr-2 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm">
+              <Download size={14} className="mr-2" />
+              Export
+            </Button>
+          </div>
+        }
+      />
 
       {/* Persistence Indicator */}
-      <div 
-        className="nu-card-elevated" 
-        style={{ 
-          padding: "12px 20px", 
-          backgroundColor: "rgba(0, 230, 118, 0.05)", 
-          borderLeft: "3px solid #00E676",
-          display: "flex",
-          alignItems: "center",
-          gap: 12
-        }}
-      >
-        <ShieldCheck size={18} color="#00E676" />
-        <div className="font-mono-ibm" style={{ fontSize: 13, color: "#F0F4FF" }}>
+      <Card className="bg-success/5 border-l-4 border-l-success flex items-center gap-3 p-4">
+        <ShieldCheck size={20} className="text-success" />
+        <div className="font-mono-code text-sm text-text-primary">
           Active Session encrypted with 256-bit SHA. Logs are IRDAI compliant and hash-locked every 24 hours.
         </div>
-      </div>
+      </Card>
 
       {/* Table & Filters */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div className="nu-card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ position: "relative", flex: 1 }}>
-            <Search size={14} color="#485068" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+      <div className="flex flex-col gap-4">
+        <Card className="p-4 flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
             <input 
               type="text" 
-              className="nu-input" 
+              className="w-full bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:border-brand-500" 
               placeholder="Search audit trail..." 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
-              style={{ paddingLeft: 36 }} 
             />
           </div>
-          <select className="nu-select" value={filter} onChange={e => setFilter(e.target.value)} style={{ width: 160 }}>
+          <select 
+            className="w-full sm:w-[160px] bg-surface-raised border border-surface-border text-sm text-text-primary rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500" 
+            value={filter} 
+            onChange={e => setFilter(e.target.value)}
+          >
             <option value="all">All Event Types</option>
             <option value="action">Human Action</option>
             <option value="agent">Agent Node</option>
@@ -136,66 +119,76 @@ export default function AuditLog() {
             <option value="system">System Event</option>
             <option value="auth">Auth Event</option>
           </select>
-        </div>
+        </Card>
 
-        <div className="nu-card" style={{ padding: 0, overflow: "hidden" }}>
-          <table className="nu-table">
-            <thead>
-              <tr>
-                <th style={{ width: 110 }}>Log ID</th>
-                <th>Entity / Node</th>
-                <th>Event Description</th>
-                <th style={{ width: 140 }}>Target Policy</th>
-                <th style={{ width: 120 }}>Role</th>
-                <th style={{ width: 100 }}>Timestamp</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLogs.map((l: any, i: number) => {
-                const isRealData = l.timestamp !== undefined || l.action !== undefined;
-                return (
-                  <tr key={l.id || i} className={`stagger-${(i % 6) + 1}`}>
-                    <td><span className="nu-mono-value" style={{ fontSize: 11, color: "#485068" }}>{l.id || `LOG-${9000 + i}`}</span></td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {isRealData && l.user_id?.includes("llama") ? <Bot size={14} color="#00D4FF" /> : <User size={14} color="#8A95B0" />}
-                        <span style={{ color: "#F0F4FF", fontWeight: 500, fontSize: 13 }}>{l.user_id || l.user || "System"}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: l.action?.includes("OVERRIDE") ? "#FFB300" : l.user_id?.includes("llama") ? "#00D4FF" : "#8A95B0" }} />
-                        <span className="nu-muted" style={{ fontSize: 13 }}>{l.details || l.event || "No details"}</span>
-                      </div>
-                    </td>
-                    <td><span className="nu-mono-value" style={{ fontSize: 12, color: "#0066FF" }}>{l.entity_id || l.policy || "N/A"}</span></td>
-                    <td><span className="font-roboto-mono" style={{ fontSize: 10, color: "#485068", textTransform: "uppercase" }}>{l.entity_type || l.role || "USER"}</span></td>
-                    <td className="nu-mono-value" style={{ fontSize: 11, color: "#485068" }}>{l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : l.time}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-border bg-surface-raised/50">
+                  <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs w-[110px]">Log ID</th>
+                  <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs">Entity / Node</th>
+                  <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs">Event Description</th>
+                  <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs w-[140px]">Target Policy</th>
+                  <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs w-[120px]">Role</th>
+                  <th className="px-4 py-3 font-medium text-text-tertiary text-left uppercase tracking-wider text-xs w-[100px]">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {filteredLogs.map((l: any, i: number) => {
+                  const isRealData = l.timestamp !== undefined || l.action !== undefined;
+                  return (
+                    <tr key={l.id || i} className="hover:bg-surface-raised transition-colors">
+                      <td className="px-4 py-3">
+                        <span className="font-mono-code text-xs text-text-tertiary">{l.id || `LOG-${9000 + i}`}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {isRealData && l.user_id?.includes("llama") ? <Bot size={14} className="text-ai" /> : <User size={14} className="text-text-tertiary" />}
+                          <span className="text-text-primary font-medium text-sm">{l.user_id || l.user || "System"}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-1.5 h-1.5 rounded-full ${l.action?.includes("OVERRIDE") ? "bg-warning" : l.user_id?.includes("llama") ? "bg-ai" : "bg-text-tertiary"}`} />
+                          <span className="text-sm text-text-secondary">{l.details || l.event || "No details"}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono-code text-brand-500 text-xs">{l.entity_id || l.policy || "N/A"}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono-code text-text-tertiary text-[10px] uppercase">{l.entity_type || l.role || "USER"}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono-code text-text-tertiary text-xs">{l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : l.time}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       </div>
 
       {/* Verification Panel */}
-      <div className="nu-card-elevated" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Zap size={14} color="#00D4FF" fill="#00D4FF" />
-          <span className="font-mono-ibm" style={{ fontSize: 14, fontWeight: 700 }}>Chain-of-Trust Verification</span>
+      <Card className="p-6 flex flex-col gap-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Zap size={16} className="text-ai" />
+          <span className="font-semibold text-text-primary text-sm">Chain-of-Trust Verification</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <div className="nu-card" style={{ padding: 12, backgroundColor: "#0E1118" }}>
-            <div className="kpi-label" style={{ fontSize: 8 }}>Last Hash Block</div>
-            <div className="nu-mono-value" style={{ fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#F0F4FF" }}>0xCF2D7E938B9C82301A4B7DDA14C234E</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-surface-raised border border-surface-border p-3 rounded-lg flex flex-col gap-1">
+            <div className="text-xs text-text-tertiary uppercase tracking-wider font-semibold">Last Hash Block</div>
+            <div className="font-mono-code text-xs text-text-primary truncate">0xCF2D7E938B9C82301A4B7DDA14C234E</div>
           </div>
-          <div className="nu-card" style={{ padding: 12, backgroundColor: "#0E1118" }}>
-            <div className="kpi-label" style={{ fontSize: 8 }}>Protocol Status</div>
-            <div className="nu-mono-value" style={{ fontSize: 11, color: "#00E676" }}>✓ VERIFIED BY IRDAI NODE</div>
+          <div className="bg-surface-raised border border-surface-border p-3 rounded-lg flex flex-col gap-1">
+            <div className="text-xs text-text-tertiary uppercase tracking-wider font-semibold">Protocol Status</div>
+            <div className="font-mono-code text-xs text-success">✓ VERIFIED BY IRDAI NODE</div>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
