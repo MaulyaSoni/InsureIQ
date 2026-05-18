@@ -58,9 +58,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="InsureIQ API", version="1.0.0", lifespan=lifespan)
 register_exception_handlers(app)
 
+# Configure CORS. In production we allow Vercel preview/production domains
+# via a regex; in development we use the configured origins list.
+cors_allow_origins = []
+cors_allow_origin_regex = None
+if settings.environment == "production":
+    # allow any vercel.app subdomain (preview + production)
+    cors_allow_origin_regex = r"https://.*\\.vercel\\.app"
+else:
+    cors_allow_origins = settings.cors_list()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_list(),
+    allow_origins=cors_allow_origins,
+    allow_origin_regex=cors_allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
