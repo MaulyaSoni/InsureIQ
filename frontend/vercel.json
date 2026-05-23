@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://insureiq-production-8adc.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/chat/:path*",
+      "destination": "https://insureiq-production-8adc.up.railway.app/chat/:path*"
+    },
+    {
+      "source": "/((?!api|chat|assets|favicon.ico|InsureIQ_logo.png).*|[^.]+)",
+      "destination": "/index.html"
+    }
+  ]
+}
