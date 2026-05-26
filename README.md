@@ -2,8 +2,7 @@
 
 > **Production-grade insurance intelligence platform** combining XGBoost claim prediction, SHAP explainability, and a LangGraph multi-agent pipeline — all powered by Groq LLM on a React + FastAPI stack.
 
-**Live Demo →** `https://insureiq.vercel.app` &nbsp;|&nbsp; **API →** `https://insureiq.up.railway.app`
-
+**Live Demo →** `https://insure-iq-com.vercel.app/login` &nbsp;|&nbsp;
 ---
 
 ## What It Does
