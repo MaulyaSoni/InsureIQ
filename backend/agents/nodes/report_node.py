@@ -90,31 +90,32 @@ def report_node(state: InsureIQState) -> InsureIQState:
         premium_min = state.get("premium_min", 0)
         premium_max = state.get("premium_max", 0)
         
-        fallback_content = f"""# InsureIQ Underwriting Report 
+        fallback_content = f"""[LLM fallback]
+# InsureIQ Underwriting Report
 
-**Policy:** {state.get('policy_data', {}).get('policy_number', 'N/A')}  
-**Holder:** {state.get('policy_data', {}).get('policyholder_name', 'N/A')}  
-**Generated:** {datetime.now().strftime('%d %B %Y, %H:%M')} 
+**Policy:** {state.get('policy_data', {}).get('policy_number', 'N/A')}
+**Holder:** {state.get('policy_data', {}).get('policyholder_name', 'N/A')}
+**Generated:** {datetime.now().strftime('%d %B %Y, %H:%M')}
 
---- 
+## Risk Assessment
+- Risk Score: {risk_score} /100
+- Risk Band: {risk_band}
+- Claim Probability: {prob}%
 
-## Risk Assessment 
-- Risk Score: {risk_score} /100 
-- Risk Band: {risk_band} 
-- Claim Probability: {prob} % 
+## Risk Explanation
+{explanation}
 
-## Risk Explanation 
-{explanation} 
+## Premium Recommendation
+Estimated annual premium range: Rs {premium_min:,} - Rs {premium_max:,}
 
-## Premium Recommendation 
-Estimated annual premium range: ₹{premium_min:,} – ₹{premium_max:,} 
+## Underwriting Decision
+Based on the current risk profile, this policy is classified as **{risk_band}**.
+{'Standard approval recommended.' if risk_band in ('LOW', 'MEDIUM') else 'Manual review recommended before binding.'}
 
-## Underwriting Decision 
-Based on the risk profile, this policy is classified as **{risk_band}**. 
-{'Standard approval recommended.' if risk_band in ('LOW', 'MEDIUM') else 'Manual review recommended before binding.'} 
+## Policy Snapshot
+{state.get("policy_data", {})}
 
---- 
-*This report was generated using InsureIQ v1.0. AI narrative temporarily unavailable — data sourced directly from XGBoost risk model. Verify with licensed insurance professionals before making underwriting decisions.* 
+AI-generated analysis. Verify with licensed insurance professionals before making underwriting decisions.
 """
         report_id = str(uuid.uuid4())
         state["final_report"] = fallback_content

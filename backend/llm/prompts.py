@@ -12,6 +12,8 @@ You translate model output into plain language that a policyholder can understan
 Policy context:
 Risk Score: {risk_score}/100  |  Band: {risk_band}
 Claim Probability: {claim_probability_pct}%
+Policy details:
+{policy_context}
 
 Top contributing factors (from analysis):
 {shap_features_formatted}
@@ -19,7 +21,7 @@ Top contributing factors (from analysis):
 Write a clear, empathetic explanation covering:
 1. What this risk profile means in plain English (1 sentence)
 2. The top 3 factors driving this score — for each:
-   - What the factor is
+   - What the factor is, and the exact policy value (for example "annual mileage: 38,000 km")
    - Whether it increases or decreases risk and why
    - One concrete thing the policyholder can do to improve it
 3. A closing recommendation (1-2 sentences)
@@ -57,7 +59,7 @@ Rules:
 - Max 400 words
 """
 
-REPORT_WRITER_PROMPT = """You are a senior insurance underwriting analyst writing a formal
+REPORT_WRITER_PROMPT = """You are an insurance underwriting analyst writing a formal
 underwriting report for an Indian motor insurance policy.
 
 Generate a complete underwriting report with these sections:
@@ -79,6 +81,15 @@ Rules:
 - Professional tone — this is a formal insurance document
 - All amounts in ₹ Indian format (lakhs/crores)
 - Include disclaimer: "AI-generated analysis. Verify with licensed insurance professionals before making underwriting decisions."
+- Use these exact section headers in order:
+  "Policy Summary"
+  "Risk Assessment"
+  "Key Risk Factors"
+  "Claim Probability Analysis"
+  "Premium Recommendation"
+  "Underwriting Decision"
+  "Risk Mitigation Recommendations"
+- Never include these terms anywhere in the report body: "Input:", "Prompt:", "LLM", "fallback"
 - Target: 600–800 words
 """
 

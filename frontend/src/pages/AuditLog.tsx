@@ -8,7 +8,7 @@ import {
   Bot,
   RefreshCw,
 } from "lucide-react";
-import { getAuditLog } from "@/lib/api";
+import { exportAuditLogCsv, getAuditLog } from "@/lib/api";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
@@ -56,6 +56,23 @@ export default function AuditLog() {
     fetchLogs().finally(() => setLoading(false));
   };
 
+  const handleExport = async () => {
+    try {
+      const blob = await exportAuditLogCsv();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `insureiq-audit-log-${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Audit log exported");
+    } catch (err: any) {
+      toast.error(err?.message || "Audit export failed");
+    }
+  };
+
   const filteredLogs = logs.length > 0 
     ? logs.filter(l => 
         ((l.user_id || "").toLowerCase().includes(search.toLowerCase()) || (l.details || "").toLowerCase().includes(search.toLowerCase())) &&
@@ -78,7 +95,7 @@ export default function AuditLog() {
               <RefreshCw size={14} className={`mr-2 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExport}>
               <Download size={14} className="mr-2" />
               Export
             </Button>

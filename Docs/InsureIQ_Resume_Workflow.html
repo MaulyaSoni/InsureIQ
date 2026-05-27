@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsureIQ — Architecture + Resume</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #0C0E16; color: #F1F2F6; padding: 24px; }
+  .page { max-width: 960px; margin: 0 auto; }
+
+  h1 { font-size: 28px; font-weight: 700; color: #A5A0F0; margin-bottom: 4px; }
+  h2 { font-size: 14px; font-weight: 600; color: #F1F2F6; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .sub { font-size: 13px; color: #6B7280; margin-bottom: 28px; }
+
+  /* ── Resume Bullets ────────────────────────────── */
+  .resume-section { margin-bottom: 32px; }
+  .bullet-card {
+    background: #131520;
+    border: 1px solid #252B3D;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 10px;
+    border-left: 3px solid #534AB7;
+  }
+  .bullet-num { font-size: 10px; font-weight: 700; color: #534AB7; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+  .bullet-text { font-size: 13px; color: #E5E7EB; line-height: 1.7; }
+  .bullet-text strong { color: #A5A0F0; }
+  .bullet-text em { color: #67E8F9; font-style: normal; font-weight: 500; }
+  .skills-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .skill { font-size: 10px; padding: 2px 8px; border-radius: 99px; border: 1px solid #252B3D; color: #9CA3AF; }
+
+  /* ── Workflow Diagram ──────────────────────────── */
+  .diagram-section { margin-bottom: 32px; }
+  .diagram-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6B7280; margin-bottom: 12px; }
+  .flow { display: flex; flex-direction: column; gap: 6px; }
+  .flow-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .flow-label { font-size: 10px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: .06em; min-width: 80px; text-align: right; flex-shrink: 0; }
+  .flow-nodes { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .node { padding: 7px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .n-user   { background: #1A1730; border: 1.5px solid #534AB7; color: #A5A0F0; }
+  .n-fe     { background: #1A1730; border: 1.5px solid #7C3AED; color: #C4B5FD; }
+  .n-api    { background: #1A1730; border: 1.5px solid #534AB7; color: #A5A0F0; }
+  .n-lg     { background: #26215C; border: 1.5px solid #534AB7; color: #CECBF6; }
+  .n-ml     { background: #3D2700; border: 1.5px solid #D97706; color: #FDE68A; }
+  .n-llm    { background: #012B33; border: 1.5px solid #0891B2; color: #67E8F9; }
+  .n-db     { background: #052E16; border: 1.5px solid #16A34A; color: #86EFAC; }
+  .n-out    { background: #3B0010; border: 1.5px solid #E11D48; color: #FDA4AF; }
+  .n-sse    { background: #3B1200; border: 1.5px solid #EA580C; color: #FDBA74; }
+  .n-tool   { background: #012B33; border: 1.5px dashed #0891B2; color: #67E8F9; }
+  .arrow    { color: #4B5563; font-size: 16px; flex-shrink: 0; }
+  .arrow-down { color: #4B5563; font-size: 14px; text-align: center; padding: 2px 0 2px 88px; }
+  .divider  { height: 1px; background: #1F2937; margin: 10px 0; }
+
+  /* Pipeline nodes special */
+  .pipeline { background: #131520; border: 1px solid #252B3D; border-radius: 14px; padding: 14px 16px; }
+  .p-nodes  { display: flex; align-items: stretch; gap: 0; overflow-x: auto; }
+  .p-node   { display: flex; flex-direction: column; align-items: center; min-width: 110px; padding: 10px 8px; border-radius: 10px; gap: 4px; }
+  .p-name   { font-size: 11px; font-weight: 700; text-align: center; }
+  .p-sub    { font-size: 9px; font-weight: 400; text-align: center; opacity: .8; }
+  .p-arrow  { display: flex; align-items: center; color: #4B5563; font-size: 18px; padding: 0 4px; align-self: center; }
+  .p1 { background: #26215C; }
+  .p2 { background: #3D2700; }
+  .p3 { background: #012B33; }
+  .p4 { background: #052E16; }
+  .p5 { background: #3B0010; }
+
+  /* Context summary */
+  .ctx-section { background: #131520; border: 1px solid #252B3D; border-radius: 14px; padding: 20px; margin-bottom: 32px; }
+  .ctx-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .ctx-col h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #16A34A; margin-bottom: 10px; }
+  .ctx-col.pending h3 { color: #D97706; }
+  .ctx-item { display: flex; gap: 8px; margin-bottom: 6px; font-size: 12px; color: #9CA3AF; align-items: flex-start; }
+  .ctx-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .dot-g { background: #16A34A; }
+  .dot-a { background: #D97706; }
+  .dot-r { background: #DC2626; }
+
+  /* v2 teaser */
+  .v2-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  @media print {
+    body { background: white; color: #0F1117; }
+    .bullet-card { border-color: #E5E7EB; background: #F9FAFB; }
+    .bullet-text { color: #111827; }
+    .bullet-num { color: #4338CA; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>InsureIQ</h1>
+  <p class="sub">B2B Vehicle Insurance Risk Analytics · insure-iq-sepia.vercel.app · Backend: Render · Single-Tenant Whitelabel</p>
+
+  <!-- ── RESUME BULLETS ─────────────────────────── -->
+  <div class="resume-section">
+    <h2>3 Resume Bullets — Verified Against Actual Deployment</h2>
+
+    <div class="bullet-card">
+      <div class="bullet-num">Bullet 1 — Agentic AI Architecture</div>
+      <div class="bullet-text">
+        Built <strong>InsureIQ</strong> — a deployed B2B vehicle insurance underwriting platform (<em>insure-iq-sepia.vercel.app</em>) using a <strong>4-node LangGraph StateGraph</strong> (Supervisor → XGBoost Risk → SHAP Explainer → Report Writer) with real-time <strong>SSE agent execution tracing</strong>, streaming Groq LLM responses (<em>llama-3.3-70b-versatile</em>), and an insurance-domain copilot chatbot with policy-context awareness.
+      </div>
+      <div class="skills-row">
+        <span class="skill">LangGraph</span><span class="skill">Groq</span><span class="skill">SSE Streaming</span><span class="skill">FastAPI</span><span class="skill">Agentic AI</span>
+      </div>
+    </div>
+
+    <div class="bullet-card">
+      <div class="bullet-num">Bullet 2 — Applied ML + Explainable AI</div>
+      <div class="bullet-text">
+        Engineered an end-to-end <strong>Explainable AI pipeline</strong> — trained <em>XGBoost classifier (AUC 0.71)</em> on 100K+ insurance records for claim probability prediction, integrated <strong>SHAP TreeExplainer</strong> for feature attribution, and implemented an LLM-powered plain-language explanation layer that cites actual policy values (<em>"vehicle age 11 yrs exceeds 8-yr actuarial threshold"</em>), enabling <strong>IRDAI-compliant explainable underwriting decisions</strong>.
+      </div>
+      <div class="skills-row">
+        <span class="skill">XGBoost</span><span class="skill">SHAP</span><span class="skill">Explainable AI</span><span class="skill">Scikit-learn</span><span class="skill">Pandas</span>
+      </div>
+    </div>
+
+    <div class="bullet-card">
+      <div class="bullet-num">Bullet 3 — Production B2B System</div>
+      <div class="bullet-text">
+        Designed and deployed a <strong>production-grade B2B SaaS platform</strong> on <em>Vercel + Render</em> with <strong>single-tenant whitelabel architecture</strong> (Dockerised, per-client deployment, zero cross-client data exposure) — featuring JWT auth with RBAC (Admin/Manager/Analyst/Viewer), <strong>IRDAI audit trail</strong> logging every underwriting action, batch portfolio analysis across 247 policies, PDF report generation, and a <em>React + Framer Motion</em> Neural Underwriting UI with full dark/light mode.
+      </div>
+      <div class="skills-row">
+        <span class="skill">Docker</span><span class="skill">FastAPI</span><span class="skill">SQLAlchemy</span><span class="skill">React</span><span class="skill">Framer Motion</span><span class="skill">RBAC</span><span class="skill">Vercel</span><span class="skill">Render</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WHAT'S ACHIEVED ────────────────────────── -->
+  <div class="ctx-section">
+    <h2 style="margin-bottom:14px">Project Achievement Context</h2>
+    <div class="ctx-row">
+      <div class="ctx-col">
+        <h3>✓ Shipped (v1 live)</h3>
+        <div class="ctx-item"><span class="dot dot-g"></span>XGBoost claim prediction (AUC 0.71) + SHAP explainability</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>LangGraph 4-node StateGraph with InsureIQState</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>Groq LLM: llama-3.3-70b / mixtral-8x7b / llama-3.1-8b</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>SSE streaming agent trace (nodes light up live)</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>Streaming chatbot with policy context awareness</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>JWT auth + RBAC (4 roles)</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>Batch portfolio analysis (247 seeded policies)</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>PDF underwriting report generation (ReportLab)</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>Neural Underwriting dark theme + Framer Motion</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>Deployed: Vercel (FE) + Render (BE)</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>Single-tenant B2B whitelabel architecture</div>
+        <div class="ctx-item"><span class="dot dot-g"></span>SQLite audit log (IRDAI compliance trail)</div>
+      </div>
+      <div class="ctx-col pending">
+        <h3>⚡ In Progress / v1 Fixes</h3>
+        <div class="ctx-item"><span class="dot dot-a"></span>PDF bug — fallback prints prompt text (fix ready)</div>
+        <div class="ctx-item"><span class="dot dot-a"></span>SHAP field mismatch — risk_factors vs shap_features</div>
+        <div class="ctx-item"><span class="dot dot-a"></span>ClaimPrediction.tsx → /claims/eligibility not wired</div>
+        <div class="ctx-item"><span class="dot dot-a"></span>modules.py — hardcoded templates still present</div>
+        <div class="ctx-item"><span class="dot dot-a"></span>Toast notifications — 8 key actions missing feedback</div>
+        <div class="ctx-item"><span class="dot dot-a"></span>Empty states on Policies / Reports / Batch</div>
+        <div class="ctx-item"><span class="dot dot-a"></span>Audit log CSV export endpoint</div>
+        <div class="ctx-item"><span class="dot dot-a"></span>Chat message persistence to SQLite</div>
+        <div class="ctx-item"><span class="dot dot-a"></span>Premium what-if → before/after/delta response</div>
+        <div class="ctx-item"><span class="dot dot-r"></span>v2 MCP tools (IRDAI lookup, fraud check, Vahan)</div>
+        <div class="ctx-item"><span class="dot dot-r"></span>ReAct loop upgrade for chatbot</div>
+        <div class="ctx-item"><span class="dot dot-r"></span>Demo video + README live URLs</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WORKFLOW DIAGRAM ───────────────────────── -->
+  <div class="diagram-section">
+    <h2>System Workflow</h2>
+
+    <div class="flow">
+
+      <!-- Input -->
+      <div class="diagram-title">① Input Layer</div>
+      <div class="flow-row">
+        <span class="flow-label">User</span>
+        <div class="flow-nodes">
+          <div class="node n-user">👤 Underwriter</div>
+          <span class="arrow">→</span>
+          <div class="node n-fe">React UI<br><span style="font-size:9px;font-weight:400">Vite+TS+Framer</span></div>
+          <span class="arrow">→</span>
+          <div class="node n-api">FastAPI<br><span style="font-size:9px;font-weight:400">JWT · CORS</span></div>
+          <span class="arrow">→</span>
+          <div class="node n-sse">SSE Opens<br><span style="font-size:9px;font-weight:400">/run-all/stream</span></div>
+        </div>
+      </div>
+
+      <div class="arrow-down">↓</div>
+      <div class="divider"></div>
+
+      <!-- LangGraph Pipeline -->
+      <div class="diagram-title">② LangGraph StateGraph (shared InsureIQState)</div>
+      <div class="pipeline">
+        <div class="p-nodes">
+          <div class="p-node p1">
+            <div class="p-name" style="color:#CECBF6">① Supervisor</div>
+            <div class="p-sub" style="color:#A5A0F0">llama-3.1-8b<br>Intent routing</div>
+          </div>
+          <div class="p-arrow">→</div>
+          <div class="p-node p2">
+            <div class="p-name" style="color:#FDE68A">② Risk Node</div>
+            <div class="p-sub" style="color:#FCD34D">XGBoost AUC 0.71<br>Claim probability</div>
+          </div>
+          <div class="p-arrow">→</div>
+          <div class="p-node p3">
+            <div class="p-name" style="color:#67E8F9">③ Explainer</div>
+            <div class="p-sub" style="color:#A5F3FC">SHAP + llama-3.3-70b<br>Plain language</div>
+          </div>
+          <div class="p-arrow">→</div>
+          <div class="p-node p4">
+            <div class="p-name" style="color:#86EFAC">④ Premium</div>
+            <div class="p-sub" style="color:#A7F3D0">mixtral-8x7b<br>IRDAI range</div>
+          </div>
+          <div class="p-arrow">→</div>
+          <div class="p-node p5">
+            <div class="p-name" style="color:#FDA4AF">⑤ Report</div>
+            <div class="p-sub" style="color:#FCA5A5">llama-3.3-70b<br>PDF document</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down">↓ &nbsp;&nbsp;&nbsp;SSE streams each node_start / token / node_complete to frontend</div>
+      <div class="divider"></div>
+
+      <!-- Storage -->
+      <div class="diagram-title">③ Persistence Layer</div>
+      <div class="flow-row">
+        <span class="flow-label">Storage</span>
+        <div class="flow-nodes">
+          <div class="node n-db">Policies DB<br><span style="font-size:9px;font-weight:400">SQLite + SQLAlchemy</span></div>
+          <span class="arrow">·</span>
+          <div class="node n-db">Predictions<br><span style="font-size:9px;font-weight:400">Risk scores + SHAP</span></div>
+          <span class="arrow">·</span>
+          <div class="node n-db">LLM Cache<br><span style="font-size:9px;font-weight:400">SHA256 · 24h TTL</span></div>
+          <span class="arrow">·</span>
+          <div class="node n-db">Audit Log<br><span style="font-size:9px;font-weight:400">IRDAI compliance</span></div>
+        </div>
+      </div>
+
+      <div class="arrow-down">↓</div>
+      <div class="divider"></div>
+
+      <!-- Outputs -->
+      <div class="diagram-title">④ Underwriter Output</div>
+      <div class="flow-row">
+        <span class="flow-label">Output</span>
+        <div class="flow-nodes">
+          <div class="node n-out">Risk Score<br><span style="font-size:9px;font-weight:400">0-100 + band</span></div>
+          <div class="node n-out">SHAP Bars<br><span style="font-size:9px;font-weight:400">Top 5 factors</span></div>
+          <div class="node n-out">Agent Trace<br><span style="font-size:9px;font-weight:400">Live node UI</span></div>
+          <div class="node n-out">₹ Premium<br><span style="font-size:9px;font-weight:400">IRDAI aligned</span></div>
+          <div class="node n-out">PDF Report<br><span style="font-size:9px;font-weight:400">7 sections</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Chatbot -->
+      <div class="diagram-title">⑤ AI Copilot (Streaming Chat)</div>
+      <div class="flow-row">
+        <span class="flow-label">Chat</span>
+        <div class="flow-nodes">
+          <div class="node n-user">Question</div>
+          <span class="arrow">→</span>
+          <div class="node n-fe">ChatDrawer<br><span style="font-size:9px;font-weight:400">policy context</span></div>
+          <span class="arrow">→</span>
+          <div class="node n-api">POST /chat/stream</div>
+          <span class="arrow">→</span>
+          <div class="node n-llm">llama-3.3-70b<br><span style="font-size:9px;font-weight:400">streams tokens</span></div>
+          <span class="arrow">→</span>
+          <div class="node n-sse">SSE tokens<br><span style="font-size:9px;font-weight:400">word-by-word</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- B2B Deploy -->
+      <div class="diagram-title">⑥ B2B Deployment Model</div>
+      <div class="flow-row">
+        <span class="flow-label">Deploy</span>
+        <div class="flow-nodes">
+          <div class="node n-fe">Vercel<br><span style="font-size:9px;font-weight:400">React frontend</span></div>
+          <span class="arrow">+</span>
+          <div class="node n-api">Render<br><span style="font-size:9px;font-weight:400">FastAPI backend</span></div>
+          <span class="arrow">→</span>
+          <div class="node n-db" style="min-width:140px">Per-Client Instance<br><span style="font-size:9px;font-weight:400">Docker · own cloud · own DB · own .env</span></div>
+          <span class="arrow">→</span>
+          <div class="node n-user">Zero Data Leakage<br><span style="font-size:9px;font-weight:400">IRDAI compliant</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- V2 -->
+      <div class="diagram-title">⑦ v2 — MCP Tool-Using ReAct Agent (Planned)</div>
+      <div class="flow-row">
+        <span class="flow-label">v2 Tools</span>
+        <div class="flow-nodes v2-row">
+          <div class="node n-tool">IRDAI Tariff<br><span style="font-size:9px;font-weight:400">premium floors</span></div>
+          <div class="node n-tool">Fraud Check<br><span style="font-size:9px;font-weight:400">signals DB</span></div>
+          <div class="node n-tool">Vahan Lookup<br><span style="font-size:9px;font-weight:400">vehicle registry</span></div>
+          <div class="node n-tool">Market Bench<br><span style="font-size:9px;font-weight:400">ICICI/HDFC/Digit</span></div>
+          <div class="node n-tool">Portfolio SQL<br><span style="font-size:9px;font-weight:400">NL → answer</span></div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#6B7280;margin-top:6px;padding-left:88px">
+        ReAct Loop: Thought → Tool Call → Observe → Thought → Final Answer (with citations)
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

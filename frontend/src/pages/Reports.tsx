@@ -92,7 +92,18 @@ export default function Reports() {
    const handleDownloadPDF = async (reportId: string, policyNumber: string) => {
      try {
        const res = await downloadReportPDF(reportId);
-       if (!res.ok) throw new Error("PDF generation failed");
+       if (!res.ok) {
+         let detail = "PDF generation failed";
+         try {
+           const body = await res.json();
+           detail = body?.detail?.detail || body?.detail || detail;
+         } catch {
+           // ignore parse errors
+         }
+         const err = new Error(detail) as Error & { status?: number };
+         err.status = res.status;
+         throw err;
+       }
        const blob = await res.blob();
        const url = URL.createObjectURL(blob);
        const a = document.createElement("a");
@@ -102,8 +113,12 @@ export default function Reports() {
        a.click();
        document.body.removeChild(a);
        URL.revokeObjectURL(url);
-     } catch (err) {
-       toast.error("PDF download failed");
+     } catch (err: any) {
+       if (err?.status === 422) {
+         toast.error("Report unavailable. Re-run analysis.");
+         return;
+       }
+       toast.error(err?.message || "PDF download failed");
      }
    };
 

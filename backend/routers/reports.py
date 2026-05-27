@@ -107,6 +107,14 @@ def report_pdf(report_id: str, db: Session = Depends(get_db), user: User = Depen
         report = db.query(Report).filter(Report.id == report_id, Report.user_id == user.id).first()
         if not report:
             raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "detail": "Report not found"})
+        if "[LLM fallback]" in (report.content or ""):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "REPORT_FALLBACK_ONLY",
+                    "detail": "Report narrative unavailable. Re-run analysis to generate a full report before downloading PDF.",
+                },
+            )
 
         packet = BytesIO()
         c = canvas.Canvas(packet, pagesize=A4)
@@ -118,10 +126,8 @@ def report_pdf(report_id: str, db: Session = Depends(get_db), user: User = Depen
         y = height - 70
         content = report.content or "No content available for this report."
         
-        # Strip Markdown and handle fallback text
+        # Strip Markdown for a clean PDF body
         import re
-        if "[LLM fallback]" in content:
-            content = "Report narrative is temporarily unavailable. AI systems are currently being tuned. Please contact support if this persists."
         
         # Basic markdown cleaning for plain text PDF
         content = re.sub(r'^#+\s*', '', content, flags=re.MULTILINE) # Remove headers

@@ -222,9 +222,9 @@ export default function RiskAssessment() {
                             }
                           </p>
                           <div className="flex flex-wrap gap-2 mt-4">
-                            {policy.latest_risk_prediction?.risk_factors?.map((f: string) => (
-                              <Badge key={f} variant="outline" size="sm" className="bg-surface-raised text-[10px]">
-                                {f}
+                            {(policy.latest_risk_prediction?.shap_features || policy.shap_features || policy.risk_factors || []).map((f: any, idx: number) => (
+                              <Badge key={`${idx}-${typeof f === "string" ? f : (f?.feature_name || "factor")}`} variant="outline" size="sm" className="bg-surface-raised text-[10px]">
+                                {typeof f === "string" ? f : (f?.plain_name || f?.feature_name || "Factor")}
                               </Badge>
                             )) || <Badge variant="outline" size="sm">Standard Risk Profile</Badge>}
                           </div>
@@ -252,7 +252,7 @@ export default function RiskAssessment() {
 
                {/* Pipeline Trace or SHAP */}
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <SHAPBreakdownCard features={policy.latest_risk_prediction?.shap_features || policy.risk_factors || []} />
+                  <SHAPBreakdownCard features={policy.latest_risk_prediction?.shap_features || policy.shap_features || policy.risk_factors || []} />
                   <Card className="p-0 overflow-hidden flex flex-col">
                      <CardHeader className="px-5 py-4 border-b border-surface-border bg-surface-raised/30">
                         <CardTitle className="text-xs uppercase tracking-widest flex items-center gap-2">

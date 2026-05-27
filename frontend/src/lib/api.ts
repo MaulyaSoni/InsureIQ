@@ -221,8 +221,29 @@ export const advisePremium = async (policyId: string) => {
   };
 };
 
-export const whatIfPremium = (policyId: string, adjustments: Record<string, unknown>) =>
-  request("/premium/what-if", { method: "POST", body: JSON.stringify({ policy_id: policyId, adjustments }) });
+export const whatIfPremium = async (policyId: string, adjustments: Record<string, unknown>) => {
+  const res = await request("/premium/what-if", { method: "POST", body: JSON.stringify({ policy_id: policyId, adjustments }) });
+  if (!res) return res;
+
+  // Backward compatibility for old response keys
+  if (res.before && res.after && res.delta) {
+    return res;
+  }
+  const before = res.baseline || {};
+  const after = res.modified || {};
+  const delta = res.delta || {};
+  return {
+    before,
+    after,
+    delta: {
+      risk_score_delta: delta.risk_score_change ?? 0,
+      premium_delta: delta.premium_change_inr ?? 0,
+      premium_delta_pct: delta.premium_change_pct ?? 0,
+      narrative: res.narrative || "",
+      improved: delta.direction === "improvement",
+    },
+  };
+};
 
 // --- Reports ---
 export const generateReport = async (policyId: string) => {
@@ -342,7 +363,7 @@ export const getDashboardStats = async () => {
 
 // --- Audit ---
 export const getAuditLog = (page = 1, limit = 50) =>
-  request("/audit-log").then((rows) =>
+  request("/audit/logs").then((rows) =>
     (Array.isArray(rows) ? rows : []).slice((page - 1) * limit, page * limit).map((row) => ({
       id: row.id,
       action: row.action || "unknown",
@@ -350,9 +371,21 @@ export const getAuditLog = (page = 1, limit = 50) =>
       entity_id: row.resource_id || "",
       user_id: row.user_id || "",
       details: row.payload_hash || "",
-      timestamp: row.timestamp,
+      timestamp: row.created_at || row.timestamp,
     }))
   );
+
+export const exportAuditLogCsv = async () => {
+  const token = getToken();
+  const res = await fetch(`${BASE_URL}/audit/logs/export?format=csv`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Export failed" }));
+    throw new Error(err?.detail || "Export failed");
+  }
+  return res.blob();
+};
 
 export interface ClaimEligibilityRequest {
   policy_id: string;
@@ -362,7 +395,7 @@ export interface ClaimEligibilityRequest {
   fir_filed: boolean;
   hours_since_incident: number;
   third_party_involved: boolean;
-  damage_estimate: number;
+  damage_estimate_inr: number;
 }
 
 export interface ClaimAssessment {

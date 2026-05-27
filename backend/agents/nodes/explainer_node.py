@@ -4,7 +4,7 @@ from backend.agents.state import InsureIQState
 from backend.config import get_settings
 from backend.llm.cache import check_cache, make_cache_key, store_cache
 from backend.llm.groq_client import invoke_with_retry
-from backend.llm.prompts import RISK_EXPLAINER_PROMPT, format_shap_features
+from backend.llm.prompts import RISK_EXPLAINER_PROMPT, format_policy_summary, format_shap_features
 
 
 def explainer_node(state: InsureIQState) -> InsureIQState:
@@ -28,6 +28,7 @@ def explainer_node(state: InsureIQState) -> InsureIQState:
             risk_score=state.get("risk_score"),
             risk_band=state.get("risk_band"),
             claim_probability_pct=round(float(state.get("claim_probability", 0.0)) * 100, 2),
+            policy_context=format_policy_summary(state.get("policy_data") or {}),
             shap_features_formatted=format_shap_features(state.get("shap_features") or []),
         )
 
