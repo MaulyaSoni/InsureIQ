@@ -2,6 +2,7 @@
 
 > **A B2B underwriting intelligence platform**
 
+<<<<<<< HEAD
 [![Live Demo](https://img.shields.io/badge/Live_Demo-insureiq.vercel.app-blue?style=for-the-badge)](https://insure-iq-com.vercel.app)
 [![API](https://img.shields.io/badge/API-insureiq.up.railway.app-green?style=for-the-badge)](https://insureiq.up.railway.app)
 ![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
@@ -10,6 +11,10 @@
 ![Groq](https://img.shields.io/badge/Groq-f55036?style=for-the-badge)
 
 ## The Problem
+=======
+**Live Demo →** `https://insure-iq-com.vercel.app/login` &nbsp;|&nbsp;
+---
+>>>>>>> cd19931229945bc282773148b458b509e856a241
 
 Insurance underwriters in India manually review each policy application — checking vehicle age, city risk, prior claims, and declared use against years of experience. Most insurers process 15–20 policies per underwriter per day. There is no ML layer, no explainability, and no audit trail for pricing decisions. IRDAI increasingly requires insurers to justify their underwriting logic — but most firms cannot do this systematically.
 
